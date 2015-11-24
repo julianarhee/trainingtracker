@@ -15,7 +15,7 @@ import numpy as np
 import pymworks
 
 import cPickle as pickle
-
+import sys
 
 def session_incremented(evs, test=lambda a, b: b.value != (a.value - 1),
                    recurse=True):
@@ -269,8 +269,10 @@ if __name__ == '__main__':
     # setup correct input/output directories
     # input_path_name = '/Users/Juliana/Documents/lab/coxlab/experiments/GoNogo_BlueSquare/testcode/input'
     # output_path_name = '/Users/Juliana/Documents/lab/coxlab/experiments/GoNogo_BlueSquare/testcode/output'
-    input_path_name = 'input'
-    output_path_name = 'output'
+    # input_path_name = 'input'
+    # output_path_name = 'output'
+    input_path_name = sys.argv[1]
+    output_path_name = os.path.split(input_path_name)[0] + '/output'
 
     input_name_list = listdir_nohidden(input_path_name)
 

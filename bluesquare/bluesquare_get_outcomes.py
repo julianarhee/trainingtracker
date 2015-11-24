@@ -14,7 +14,7 @@ import os
 
 import matplotlib
 import numpy as np
-
+import sys
 
 def listdir_nohidden(path):
     dir_list = []
@@ -33,6 +33,7 @@ def fix_date(date):
         logging.error("Invalid date(%s)" % date)
         raise IOError("Invalid date(%s)" % date)
 
+
 def parse_filename(filename):
     name, ext = os.path.splitext(os.path.basename(filename))
     tokens = name.split('_')
@@ -47,6 +48,7 @@ def parse_filename(filename):
         epoch = tokens[1][-1]
         date = fix_date(tokens[1][:-1])
     return animal, date, epoch
+
 
 def get_datafiles(indir, match='*.mwk'):
     dfns = []
@@ -335,7 +337,8 @@ def adjust_spines(ax, spines):
 
 if __name__ == '__main__':
 
-    parent_input_path = 'input'
+    # parent_input_path = 'input'
+    parent_input_path = sys.argv[1]
     input_list = listdir_nohidden(parent_input_path)
 
     input_paths = []
@@ -369,6 +372,7 @@ if __name__ == '__main__':
         curr_sdata = datafiles_to_sessions(data, stats)
         sdata.update(curr_sdata)
 
+    print sdata
     nSubjects = len(sdata)
     for n in range(nSubjects):
         animal = input_list[n]
