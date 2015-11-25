@@ -633,7 +633,7 @@ if __name__ == '__main__':
         plt.subplots_adjust(top=0.9)
         plt.show()
 
-        plt.savefig('summary.png')
+        # plt.savefig('summary.png')
         plt.close('all')
 
 

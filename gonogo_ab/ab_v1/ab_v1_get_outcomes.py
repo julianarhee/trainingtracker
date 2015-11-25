@@ -14,6 +14,7 @@ import os
 
 import matplotlib
 import numpy as np
+import sys
 
 
 def listdir_nohidden(path):
@@ -335,7 +336,8 @@ def adjust_spines(ax, spines):
 
 if __name__ == '__main__':
 
-    parent_input_path = 'input'
+    # parent_input_path = 'input'
+    parent_input_path = sys.argv[1]
     input_list = listdir_nohidden(parent_input_path)
 
     input_paths = []
@@ -629,7 +631,7 @@ if __name__ == '__main__':
         plt.subplots_adjust(top=0.9)
         plt.show()
 
-        plt.savefig('summary.png')
+        # plt.savefig('summary.png')
         plt.close('all')
 
 

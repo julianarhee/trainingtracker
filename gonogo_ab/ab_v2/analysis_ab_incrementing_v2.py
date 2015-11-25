@@ -18,6 +18,7 @@ import numpy as np
 import pymworks
 
 import cPickle as pickle
+import sys
 
 
 # get_incremented_range -- not okay. removal process chunking wrong.
@@ -255,8 +256,8 @@ def adjust_spines(ax, spines):
 
 if __name__ == '__main__':
     # setup correct input/output directories
-    input_path_name = 'input'
-    output_path_name = 'output'
+    input_path_name = sys.argv[1]
+    output_path_name = os.path.split(input_path_name)[0] + '/output'
 
     input_name_list = listdir_nohidden(input_path_name)
 
@@ -571,5 +572,5 @@ if __name__ == '__main__':
         plt.subplots_adjust(top=0.9)
         plt.show()
 
-        plt.savefig('summary.png')
+        # plt.savefig('summary.png')
         plt.close('all')

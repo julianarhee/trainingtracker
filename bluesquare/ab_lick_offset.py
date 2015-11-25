@@ -26,6 +26,7 @@ import scipy.stats as sci
 import math
 
 import pymworks
+import sys
 
 def stdev(values, mean):
     size = len(values)
@@ -250,7 +251,8 @@ if __name__ == '__main__':
     # setup correct input/output directories
     # input_path_name = '/Users/Juliana/Documents/lab/coxlab/experiments/GoNogo_BlueSquare/testcode/input'
     # output_path_name = '/Users/Juliana/Documents/lab/coxlab/experiments/GoNogo_BlueSquare/testcode/output'
-    input_path_name = 'input'
+    # input_path_name = 'input'
+    input_path_name = sys.argv[1]
     # output_path_name = 'output'
 
     input_name_list = listdir_nohidden(input_path_name)

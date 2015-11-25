@@ -317,6 +317,7 @@ if __name__ == '__main__':
             key_dists = 'session_distractor_trialcounter'
 
         data = process_datafiles(dfns, stats) # super-dict
+        print data
         # contains sub-dicts, key='input/animal/animal_date', value=dict of stats
 
         file_dir = [] # make file director for this animal
@@ -350,6 +351,7 @@ if __name__ == '__main__':
         sdata.update(curr_sdata)
 
     nSubjects = len(sdata)
+    print sdata
     for n in range(nSubjects):
         animal = input_name_list[n]
         sessions = sorted(sdata[animal].keys())
@@ -584,5 +586,5 @@ if __name__ == '__main__':
         plt.subplots_adjust(top=0.9)
         plt.show()
 
-        plt.savefig('summary.png')
+        # plt.savefig('summary.png')
         plt.close('all')

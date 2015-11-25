@@ -1,8 +1,14 @@
 trainingtracker
 ===============
 
-training analysis for behavioral experiments
+training analysis for behavioral experiments -- version 1b
 
+version 1b:
+Specify input path (dir with a subfolder per animal) in command line.
+
+EX: python analysis_script.py 'path/to/dir'
+
+version 1a:
 Each .py file should be in the same directory as an "input" folder.
 
 The "input" folder should contain a sub-folder, with subject's name,

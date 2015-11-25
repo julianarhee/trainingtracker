@@ -26,7 +26,6 @@ import numpy as np
 import pymworks
 import sys
 
-input_path_name = sys.argv[1]
 
 def measure_engagement(df, name='head_input', threshold=500):
     return pymworks.stats.events.time_in_state(df.get_events(name), \
@@ -214,6 +213,7 @@ if __name__ == '__main__':
     # input_path_name = '/Users/Juliana/Documents/lab/coxlab/experiments/GoNogo_BlueSquare/testcode/input'
     # output_path_name = '/Users/Juliana/Documents/lab/coxlab/experiments/GoNogo_BlueSquare/testcode/output'
     # input_path_name = 'sessions'
+    input_path_name = sys.argv[1]
     # output_path_name = 'output'
 
     input_name_list = listdir_nohidden(input_path_name)
