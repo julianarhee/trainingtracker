@@ -28,6 +28,8 @@ import datautils
 import numpy as np
 
 import re
+import matplotlib.pyplot as plt
+
 
 ###############################################################################
 # GENERALLY USEFUL FUNCTIONS
@@ -136,35 +138,18 @@ def get_new_sessions(outpath, session_dict):
     return new_sessions
 
 
-# def get_session_summary(dfns):
-#     '''
-#     Returns and saves a dict for a given animal with session names as keys, 
-#         e.g., {'20151123_JR003E.mwk': [[{trial1 dict}, {trial2 dict}, etc.]]}
-#         nested lists in case stop and start occurred more than once mid-session
-
-#     dfns : list
-#         list of strings containing datafiles (.mwk) to be parsed
-#     '''
-#     # summary = dict()
-
-#     # 
-#     trials = parse_trials(dfns)
-
-
-#     return trials
-
 
 ###############################################################################
-# SESSION SUMMARY FUNCTIONS:
+# SESSION PARSING FUNCTIONS:
 ###############################################################################
 
 def get_session_stats():
     stats = {}
-    for n in ('session_correct_lick', 'session_bad_lick', 'session_bad_ignore', \
-            'session_correct_ignore', 'session_target_trialcounter', \
-            'session_distractor_trialcounter', \
-            'trials_in_session'): #, 'aborted_counter'):
-        stats[n] = stat(functools.partial(get_session_range, name=n))
+    # for n in ('session_correct_lick', 'session_bad_lick', 'session_bad_ignore', \
+    #         'session_correct_ignore', 'session_target_trialcounter', \
+    #         'session_distractor_trialcounter', \
+    #         'trials_in_session'): #, 'aborted_counter'):
+    #     stats[n] = stat(functools.partial(get_session_range, name=n))
     for n in ('targetprob', 'curr_contrast', 'phases_completed', \
             'targetprob_lower'):
         stats[n] = stat(functools.partial(get_last, name=n), \
@@ -199,7 +184,9 @@ def session_incremented(evs, test=lambda a, b: b.value != (a.value - 1),
     """
     Remove events where evs[i].value != (evs[i-1].value - 1)
 
-    evs[i-1] occurs later in physical time than evs[i]. Re-reverse at end.
+    evs : list 
+        mworks events
+        evs[i-1] occurs later in physical time than evs[i]. Re-reverse at end.
     """
     ## remove evs[i] if NEXT trial value (evs[i+1]) is more than CURR trial value ev[i] - 1.
 
@@ -243,13 +230,20 @@ def stat(extract_function=get_session_range, \
     return (extract_function, combine_function)
 
 
-
-
-###############################################################################
-# TRIAL PARSING FUNCS
-###############################################################################
-
 def parse_trials(dfns, remove_orphans=True):
+    """
+    Parse session .mwk files.
+    Key is session name values are lists of dicts for each trial in session.
+    Looks for all response and display events that occur within session.
+
+    dfns : list of strings
+        contains paths to each .mwk file to be parsed
+    
+    remove_orphans : boolean
+        for each response event, best matching display update event
+        set this to 'True' to remove display events with unknown outcome events
+    """
+
     trialdata = {}                                                              # initiate output dict
     
     for dfn in dfns:
@@ -259,8 +253,8 @@ def parse_trials(dfns, remove_orphans=True):
         sname = os.path.split(dfn)[1]
         trialdata[sname] = []
 
-        modes = df.get_events('#state_system_mode')
-        run_idxs = np.where(np.diff([i['time'] for i in modes])<20)
+        modes = df.get_events('#state_system_mode')                             # find timestamps for run-time start and end (2=run)
+        run_idxs = np.where(np.diff([i['time'] for i in modes])<20)             # 20 is kind of arbitray, but mode is updated twice for "run"
         bounds = []
         for r in run_idxs[0]:
             stop_ev = next(i for i in modes[r:] if i['value']==0)
@@ -279,8 +273,7 @@ def parse_trials(dfns, remove_orphans=True):
             print "----------------------------------------------------------------"
             tmp_devs = df.get_events('#stimDisplayUpdate')                      # get *all* display update events
             tmp_devs = [i for i in tmp_devs if i['time']<= boundary[1] and\
-                        i['time']>=boundary[0]]
-
+                        i['time']>=boundary[0]]                                 # only grab events within run-time bounds (see above)
 
             dimmed = df.get_events('flag_dim_target')
             dimmed = np.mean([i.value for i in dimmed])                         # set dim flag to separate trials based on initial stim presentation
@@ -315,10 +308,6 @@ def parse_trials(dfns, remove_orphans=True):
 
     return trialdata
 
-
-###############################################################################
-# do stuff...
-###############################################################################
 
 def analyze_sessions(datadir):
     F = get_session_list(datadir)                                               # list of all existent datafiles
@@ -368,100 +357,14 @@ def analyze_sessions(datadir):
         save_dict(summary, processed_path, fname)                                   # save/overwrite summary file with new session data
 
 
-def get_outcome_tallies(datadir):
 
-    animals = os.listdir(datadir)
-    processed_path = os.path.join(os.path.split(datadir)[0], 'processed')
-
-    outcomes = dict()
-    for animal in animals:
-        outfiles = [i for i in os.listdir(processed_path) if animal in i]
-        fn_trials = open([os.path.join(processed_path, i) for i in outfiles if '_trials' in i][0], 'rb')
-        trials = pkl.load(fn_trials)
-        fn_trials.close()
-
-        outcomes[animal] = dict()
-
-        for s in trials.keys():
-            outcomes[animal][s] = dict()
-            if len(trials[s]) > 1:
-                trials[s] = list(itertools.chain.from_iterable(trials[s]))
-            else:
-                trials[s] = trials[s][0]
-
-            outcomes[animal][s]['hits'] = len([i for i in trials[s] if i['outcome']=='session_correct_lick'])
-            outcomes[animal][s]['misses'] = len([i for i in trials[s] if i['outcome']=='session_bad_ignore'])
-            outcomes[animal][s]['fas'] = len([i for i in trials[s] if i['outcome']=='session_bad_lick'])
-            outcomes[animal][s]['crs'] = len([i for i in trials[s] if i['outcome']=='session_correct_ignore'])
-
-    return outcomes
-
-
-
-def get_phase_info(datadir):
-
-    animals = os.listdir(datadir)
-    processed_path = os.path.join(os.path.split(datadir)[0], 'processed')
-
-    phase_info = dict()
-    for animal in animals:
-        outfiles = [i for i in os.listdir(processed_path) if animal in i]
-        fn_summ = open([os.path.join(processed_path, i) for i in outfiles if '_summary' in i][0], 'rb')
-        summary = pkl.load(fn_summ)
-        fn_summ.close()
-
-        phase_info[animal] = dict()
-
-        for s in summary.keys():
-            phase_info[animal][s] = dict()
-            # if len(trials[s]) > 1:
-            #     summary[s] = list(itertools.chain.from_iterable(summary[s]))
-            # else:
-            #     summary[s] = summary[s][0]
-
-            phase_info[animal][s]['phases_completed'] = summary[s]['phases_completed']
-            phase_info[animal][s]['targetprob'] = summary[s]['targetprob']
-            phase_info[animal][s]['targetprob_lower'] = summary[s]['targetprob_lower']
-            phase_info[animal][s]['engagement'] = summary[s]['engagement']
-            phase_info[animal][s]['curr_contrast'] = summary[s]['curr_contrast']
-
-    return phase_info
-
-
-def plot_progress(datadir):
-    session_info = get_phase_info(datadir)
-    outcome_info = get_outcome_tallies(datadir)
-
-    animals = session_info.keys()
-
-    for animal in animals:
-
-        total_trials = [float(sum([outcome_info[animal][s][k] for k in outcome_info[animal][s].keys()])) for s in sorted(outcome_info[animal], key=natural_keys)]
-
-        time_headout = np.array([session_info[animal][s]['engagement'][0] for s in session_info[animal]])/1E6
-        time_total = np.array([session_info[animal][s]['engagement'][1] for s in session_info[animal]])/1E6
-        if not time_total.any():
-            print "ZERO DIV ERROR: ", s
-        else:
-            percent_engaged = time_headout/time_total
-
-        pct_success = [ (outcome_info[animal][s]['hits']+outcome_info[animal][s]['crs']) / total_trials[i] for i,s in enumerate(sorted(outcome_info[animal], key=natural_keys))]
-        pct_fail = [ (outcome_info[animal][s]['misses']+outcome_info[animal][s]['fas']) / total_trials[i] for i,s in enumerate(sorted(outcome_info[animal], key=natural_keys))]
-
-        pct_success_target = [ float(outcome_info[animal][s]['hits']) / (outcome_info[animal][s]['hits'] + outcome_info[animal][s]['misses']) for i,s in enumerate(sorted(outcome_info[animal], key=natural_keys))]
-        try:
-            pct_success_dist = [ float(outcome_info[animal][s]['crs']) / (outcome_info[animal][s]['crs'] + outcome_info[animal][s]['fas']) for i,s in enumerate(sorted(outcome_info[animal], key=natural_keys))]
-        except ZeroDivisionError:
-            pct_success_dist = 0.
-
-        nsessions = len(total_trials)
-        
+###############################################################################
+# do stuff...
+###############################################################################
 
 
 datadir = sys.argv[1]                                                           # data INPUT folder (all others are soft-coded relative to this one)
-            
+plot = 1
+
 if __name__ == "__main__":
     analyze_sessions(datadir)
-
-    if plot:
-        plot_progress(datadir)
