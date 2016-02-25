@@ -257,20 +257,26 @@ def parse_trials(dfns, remove_orphans=True):
         run_idxs = np.where(np.diff([i['time'] for i in modes])<20)             # 20 is kind of arbitray, but mode is updated twice for "run"
         bounds = []
         for r in run_idxs[0]:
-            stop_ev = next(i for i in modes[r:] if i['value']==0)
+            try:
+                stop_ev = next(i for i in modes[r:] if i['value']==0 or i['value']==1)
+            except StopIteration:
+                end_event_name = 'trial_end'
+                print "NO STOP DETECTED IN STATE MODES. Using alternative timestamp: %s." % end_event_name
+                stop_ev = df.get_events(end_event_name)[-1]
+                print stop_ev
             bounds.append([modes[r]['time'], stop_ev['time']])
 
-        print "................................................................"
-        # print "----------------------------------------------------------------"
+        # print "................................................................"
+        print "****************************************************************"
         print "Parsing file\n%s... " % dfn
         print "Found %i start events in session." % len(bounds)
-        print "................................................................"
+        print "****************************************************************"
 
 
         for bidx,boundary in enumerate(bounds):
-            print "----------------------------------------------------------------"
+            # print "................................................................"
             print "SECTION %i" % bidx
-            print "----------------------------------------------------------------"
+            print "................................................................"
             tmp_devs = df.get_events('#stimDisplayUpdate')                      # get *all* display update events
             tmp_devs = [i for i in tmp_devs if i['time']<= boundary[1] and\
                         i['time']>=boundary[0]]                                 # only grab events within run-time bounds (see above)

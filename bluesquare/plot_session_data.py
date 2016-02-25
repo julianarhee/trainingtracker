@@ -93,11 +93,19 @@ def get_outcome_tallies(datadir):
         outcomes[animal] = dict()
 
         for s in trials.keys():
+            
             outcomes[animal][s] = dict()
-            if len(trials[s]) > 1:
-                trials[s] = list(itertools.chain.from_iterable(trials[s]))
-            else:
-                trials[s] = trials[s][0]
+
+            try:
+                if len(trials[s]) > 1:
+                    trials[s] = list(itertools.chain.from_iterable(trials[s]))
+                else:
+                    trials[s] = trials[s][0]
+
+            except IndexError as e:
+                print e
+                print animal, s, trials[s]
+                
 
             outcomes[animal][s]['hits'] = len([i for i in trials[s] if i['outcome']=='session_correct_lick'])
             outcomes[animal][s]['misses'] = len([i for i in trials[s] if i['outcome']=='session_bad_ignore'])
@@ -112,6 +120,7 @@ def get_phase_info(datadir):
 
     animals = os.listdir(datadir)
     processed_path = os.path.join(os.path.split(datadir)[0], 'processed')
+    print processed_path
 
     phase_info = dict()
     for animal in animals:
@@ -162,6 +171,7 @@ def plot_progress(datadir):
         time_total = np.array([session_info[animal][s]['engagement'][1] for s in session_info[animal]])/1E6
         if not time_total.any():
             print "ZERO DIV ERROR: ", s
+            percent_engaged = 0.
         else:
             percent_engaged = time_headout/time_total
 
@@ -170,11 +180,20 @@ def plot_progress(datadir):
 
         phases_completed = [session_info[animal][s]['phases_completed'] for s in sorted(outcome_info[animal], key=natural_keys)]
 
-        pct_success = [ (outcome_info[animal][s]['hits']+outcome_info[animal][s]['crs']) / total_trials[i] for i,s in enumerate(sorted(outcome_info[animal], key=natural_keys))]
-        pct_fail = [ (outcome_info[animal][s]['misses']+outcome_info[animal][s]['fas']) / total_trials[i] for i,s in enumerate(sorted(outcome_info[animal], key=natural_keys))]
+        try:
+            pct_success = [ (outcome_info[animal][s]['hits']+outcome_info[animal][s]['crs']) / total_trials[i] for i,s in enumerate(sorted(outcome_info[animal], key=natural_keys))]
+            pct_fail = [ (outcome_info[animal][s]['misses']+outcome_info[animal][s]['fas']) / total_trials[i] for i,s in enumerate(sorted(outcome_info[animal], key=natural_keys))]
+        except ZeroDivisionError:
+            trials = total_trials[i] for i,s in enumerate(sorted(outcome_info[animal], key=natural_keys))
+            #### FIX ZERO DIV ERROR BY SESSION #####
 
-        pct_hits = [ float(outcome_info[animal][s]['hits']) / (outcome_info[animal][s]['hits'] + outcome_info[animal][s]['misses']) for i,s in enumerate(sorted(outcome_info[animal], key=natural_keys))]
-        pct_misses = [ float(outcome_info[animal][s]['misses']) / (outcome_info[animal][s]['hits'] + outcome_info[animal][s]['misses']) for i,s in enumerate(sorted(outcome_info[animal], key=natural_keys))]
+        try:
+            pct_hits = [ float(outcome_info[animal][s]['hits']) / (outcome_info[animal][s]['hits'] + outcome_info[animal][s]['misses']) for i,s in enumerate(sorted(outcome_info[animal], key=natural_keys))]
+            pct_misses = [ float(outcome_info[animal][s]['misses']) / (outcome_info[animal][s]['hits'] + outcome_info[animal][s]['misses']) for i,s in enumerate(sorted(outcome_info[animal], key=natural_keys))]
+        except ZeroDivisionError:
+            pct_hits = [0.]*n_sessions
+            pct_misses = [0.]*n_sessions
+
         try:
             pct_crs = [ float(outcome_info[animal][s]['crs']) / (outcome_info[animal][s]['crs'] + outcome_info[animal][s]['fas']) for i,s in enumerate(sorted(outcome_info[animal], key=natural_keys))]
             pct_fas = [ float(outcome_info[animal][s]['fas']) / (outcome_info[animal][s]['crs'] + outcome_info[animal][s]['fas']) for i,s in enumerate(sorted(outcome_info[animal], key=natural_keys))]
