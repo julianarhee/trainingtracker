@@ -1,3 +1,30 @@
+#!/usr/bin/env python2
+
+'''
+This script parses each animal's behavioral outcome data by session.
+
+Saves a .pkl in processed_path:
+
+For each session (each .mwk file), creates a time-ordered list of dicts, where each dict is info about a trial.
+
+{} [{"trial_num": 1,
+       "behavior_outcome": "failure",
+       "stm_pos_x": 7.5,
+       },
+      {"trial_num": 2,
+       "behavior_outcome": "success",
+       "stm_pos_x": -7.5
+       }]
+
+This dict is saved as a .pkl for each animal in its processed_path (e.g., "path_to_processed/animal").
+
+Also creates a dict of animal_session info as a .pkl in path_to_processed, so that only new files are processed.
+
+Option to plot, but use "plot_by_session" instead...
+
+input : /path/to/input/folders
+'''
+
 import os
 import multiprocessing
 import datetime

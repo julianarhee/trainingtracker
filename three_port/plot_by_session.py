@@ -1,5 +1,14 @@
 #!/usr/bin/env python2
 
+'''
+This script plots each animal's behavioral outcome data by session.
+It searches in -- processed_path -- for session data stored in a struct as a .pkl file.
+Analysis script "parse_session_data.py" creates these .pkl's
+
+Plots data in an .html file in plotly's offline  mode.
+
+input : /path/to/processed/structs/directory
+'''
 
 import os
 import multiprocessing
