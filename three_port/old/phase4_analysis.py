@@ -118,14 +118,15 @@ def make_summary_stats_figure(data_for_all_animals):
 
     intensity = np.ma.masked_where(np.isnan(intensity), intensity)
     plt.close('all')
-    plt.pcolormesh(X, Y, intensity.T, cmap="hot", vmin=40.0, vmax=100.0)
-    bar = plt.colorbar()
-    bar.set_label("% correct", rotation=270, labelpad=10)
+    plt.pcolormesh(X, Y, intensity.T, cmap="hot", vmin=50.0, vmax=100.0)
+    # bar = plt.colorbar()
+    # bar.set_label("% correct", rotation=270, labelpad=10)
     plt.axis('tight')
     plt.grid(True, which='minor')
     plt.title("All animals phase 4 performance")
     plt.xlabel("Stimulus rotation in depth (degrees)")
     plt.ylabel("Stimulus size (degrees visual angle)")
+    plt.axis('off') # ugly axes.. jyr 08/19/2016
     plt.show()
 
 def make_a_figure(data_for_animal):
@@ -174,14 +175,15 @@ def make_a_figure(data_for_animal):
 
     intensity = np.ma.masked_where(np.isnan(intensity), intensity)
     plt.close('all')
-    plt.pcolormesh(X, Y, intensity.T, cmap="hot", vmin=40.0, vmax=100.0)
-    bar = plt.colorbar()
-    bar.set_label("% correct", rotation=270, labelpad=10)
+    plt.pcolormesh(X, Y, intensity.T, cmap="hot", vmin=50.0, vmax=100.0)
+    # bar = plt.colorbar()
+    # bar.set_label("% correct", rotation=270, labelpad=10)
     plt.axis('tight')
     plt.grid(True, which='minor')
     plt.title(data_for_animal["animal_name"] + " phase 4 performance")
     plt.xlabel("Stimulus rotation in depth (degrees)")
     plt.ylabel("Stimulus size (degrees visual angle)")
+    plt.axis('off') # so ugly, turn off - jyr 08/19/2016
     plt.show()
 
 def get_pct_correct_for_animal(trial_outcomes):

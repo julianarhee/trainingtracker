@@ -24,7 +24,7 @@ def natural_keys(text):
 
 
 # file_dir = '/home/juliana/Documents/mworks/data'
-file_dir = '/share/coxlab-behavior/mworks-data/three_port_morphs/pnas/input/AG3'
+file_dir = '/share/coxlab-behavior/mworks-data/three_port_morphs/pnas/input/AG10'
 
 files = os.listdir(file_dir)
 print files

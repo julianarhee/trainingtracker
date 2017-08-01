@@ -24,8 +24,14 @@ import logging
 
 import pypsignifit as psi
 
-file_dir = '/share/coxlab-behavior/mworks-data/three_port_morphs/pnas'
+# file_dir = '/share/coxlab-behavior/mworks-data/three_port_morphs/pnas'
+import optparse
 
+parser = optparse.OptionParser()
+parser.add_option('--baseline', action="store_true", dest="baseline", default=False, help="baseline (pre-morphs)?")
+(options, args) = parser.parse_args()
+
+baseline = options.baseline
 
 ###############################################################################
 # GENERALLY USEFUL FUNCTIONS
@@ -160,10 +166,16 @@ def parse_trials(dfns, remove_orphans=True):
         trialdata[sname] = []
 
         modes = df.get_events('#state_system_mode')                             # find timestamps for run-time start and end (2=run)
-        run_idxs = np.where(np.diff([i['time'] for i in modes])<20)             # 20 is kind of arbitray, but mode is updated twice for "run"
+        # run_idxs = np.where(np.diff([i['time'] for i in modes])<20)             # 20 is kind of arbitray, but mode is updated twice for "run"
+        start_ev = [i for i in modes if i['value']==2][0]
+        
+        # stop_ev_ev = [i for i in modes if i['time']>start_ev['time'] and (i['value']==0 or i['value']==1)]
+        run_idxs = [i for i,e in enumerate(modes) if e['time']>start_ev['time']]
+
         bounds = []
-        for r in run_idxs[0]:
+        for r in run_idxs: #[0]:
             try:
+                # stop_ev = next(i for i in modes[r:] if i['value']==0 or i['value']==1)
                 stop_ev = next(i for i in modes[r:] if i['value']==0 or i['value']==1)
             except StopIteration:
                 end_event_name = 'trial_end'
@@ -172,6 +184,7 @@ def parse_trials(dfns, remove_orphans=True):
                 print stop_ev
             bounds.append([modes[r]['time'], stop_ev['time']])
 
+        bounds[:] = [x for x in bounds if not x[1]-x[0]<1]
         # print "................................................................"
         print "****************************************************************"
         print "Parsing file\n%s... " % dfn
@@ -180,6 +193,9 @@ def parse_trials(dfns, remove_orphans=True):
 
 
         for bidx,boundary in enumerate(bounds):
+            if (boundary[1]-boundary[0])<1:
+                del bounds[bidx]
+
             # print "................................................................"
             print "SECTION %i" % bidx
             print "................................................................"
@@ -242,15 +258,22 @@ def parse_trials(dfns, remove_orphans=True):
 
 
 
-def get_trials_by_session(datadir):
+def get_trials_by_session(datadir, baseline):
     F = get_session_list(datadir)                                               # list of all existent datafiles
 
     outpath = os.path.join(os.path.split(datadir)[0], 'info')                   # set up output path for session info
     if not os.path.exists(outpath):
         os.makedirs(outpath)
-    save_dict(F, outpath, 'sessions.pkl')
 
-    processed_path = os.path.join(os.path.split(outpath)[0], 'processed')           # path to previously processed data
+    # save_dict(F, outpath, 'sessions.pkl')
+
+    if baseline is True:
+        processed_path = os.path.join(os.path.split(outpath)[0], 'processed_premorphs')           # path to previously processed data
+        save_dict(F, outpath, 'sessions_premorphs.pkl')
+    else:
+        processed_path = os.path.join(os.path.split(datadir)[0], 'processed')
+        save_dict(F, outpath, 'sessions.pkl')
+    
     new_sessions = get_new_sessions(processed_path, F)                              # get dict of NEW sessions (and animals)
 
 
@@ -321,8 +344,11 @@ def parse_filename(filename):
 
 # fn = '/share/coxlab-behavior/mworks-data/three_port_morphs/pnas/processed/AG6_trials.pkl'
 
-def get_morph_stats(datadir, show_curve=True):
-    processed_dir = os.path.join(os.path.split(datadir)[0], 'processed')
+def get_morph_stats(datadir, baseline, show_curve=True):
+    if baseline is True:
+        processed_dir = os.path.join(os.path.split(datadir)[0], 'processed_premorphs')
+    else:
+        processed_dir = os.path.join(os.path.split(datadir)[0], 'processed')
     animals = os.listdir(processed_dir)
     animals = [i for i in animals if i.endswith('_trials.pkl')]
     animals = [os.path.splitext(a)[0] for a in animals]
@@ -341,6 +367,8 @@ def get_morph_stats(datadir, show_curve=True):
             print t
             subject, date, epoch = parse_filename(t)
             session_dates.append(date)
+
+        true_middle_idx = False # Bad indexing, incorrect assignment of halway point bw morphs in MW
 
         M = dict()
         for t in sorted(curr_trials.keys(), key=natural_keys):
@@ -363,6 +391,17 @@ def get_morph_stats(datadir, show_curve=True):
             mtrials = [i for i in ctrials if 'morph' in i['name']]
             if len(mtrials)==0:
                 continue
+
+            # Assign appropriate 1/2-way point to calculate percent RIGHT choice (or LEFT):
+            # BEFORE 08/18/2016 -- incorrect indexing, so "halway" should be 11.
+            # Otherwise, halfway should be 10.
+            if '160818' in date:
+                true_middle_idx = True # Keep this flag ON for all dates after this.
+
+            if true_middle_idx is True:
+                middle_idx = 10
+            else:
+                middle_idx = 11
 
             # Do this funky stuff to get default size:
             sizes = [i['size_x'] for i in ctrials]
@@ -395,6 +434,7 @@ def get_morph_stats(datadir, show_curve=True):
 
                 if aname not in morphs.keys():
                     morphs[aname] = dict()
+
                 morphs[aname]['success'] = sum([1 for i in anchor_trials if i['name']==m and i['outcome']=='success'])
                 morphs[aname]['failure'] = sum([1 for i in anchor_trials if i['name']==m and i['outcome']=='failure'])
                 morphs[aname]['ignore'] = sum([1 for i in anchor_trials if i['name']==m and i['outcome']=='ignore'])
@@ -402,6 +442,7 @@ def get_morph_stats(datadir, show_curve=True):
 
             M[t] = morphs
 
+        # all_morph_names = ['morph%i.png' % int(i) for i in range(22)]
         all_morph_names = ['morph%i.png' % int(i) for i in range(22)]
 
 
@@ -431,10 +472,11 @@ def get_morph_stats(datadir, show_curve=True):
                             P[animal]['session'][skey][mkey][str(morph_num)] = float(M[mkey][morph][skey])
 
                         # otherwise, need to calculate %-choose-RIGHT (or LEFT) port:
+                        # SEE NOTE BELOW on halway cutoff point...
                         elif skey == 'percent':
-                            if morph_num <= 11:
+                            if morph_num <= middle_idx: # 11: #morph_num <= 11:
                                 P[animal]['session'][skey][mkey][str(morph_num)] = float(M[mkey][morph]['success']/float(M[mkey][morph]['total']))
-                            elif morph_num > 11:
+                            elif morph_num > middle_idx: #>= 11: #> 11:
                                 P[animal]['session'][skey][mkey][str(morph_num)] = float(M[mkey][morph]['failure']/float(M[mkey][morph]['total']))
 
         ALL = dict()
@@ -463,6 +505,7 @@ def get_morph_stats(datadir, show_curve=True):
         ignores = dict()
         for m in sorted(all_morph_names, key=natural_keys):
             morph_num = int(re.findall("[-+]?\d+?\d*", m)[0])
+            print morph_num
             totals[m] = float(sum(ALL[m]['total']))
             successes[m] = float(sum(ALL[m]['success']))
             failures[m] = float(sum(ALL[m]['failure']))
@@ -470,12 +513,21 @@ def get_morph_stats(datadir, show_curve=True):
             if m not in ALL.keys() or sum(ALL[m]['total'])==0:
                 percents[m] = 0
             else:
-                if morph_num <= 11:
+                # With nmorphs = 20, morphs 1-10.png are CHOOSE-RIGHT.
+                # For now, plot %-choose-right (i.e., morphs1-10)
+                # This means, "success" for morphs1-10, and "failure" for morphs11-20 (i.e,. animal went RIGHT, when should have gone LEFT)
+                # ALL STUFF BEFORE 08/17/2016 was incorrectly assignign the halfway point in MW protocol:
+                # i.e,. was assigning indices <=10 to "left" and >10 to "right" 
+                # This should really be:  <=9 to left, >=10 to right... fixed on 08/17
+                # SEE ABOVE, for session-parsed %s...
+                if morph_num <= middle_idx: #< 11:
                     percents[m] = float(sum(ALL[m]['success'])) / float(sum(ALL[m]['total']))
-                elif morph_num > 11:
+
+                elif morph_num > middle_idx: #>= 11:
                     percents[m] = float(sum(ALL[m]['failure'])) / float(sum(ALL[m]['total']))
 
         P[animal]['percent_right'] = percents
+        print percents
         P[animal]['totals'] = totals
         P[animal]['success'] = successes
         P[animal]['failure'] = failures
@@ -510,9 +562,12 @@ def get_morph_stats(datadir, show_curve=True):
 
     return P
 
-def get_morph_counts(datadir):
+def get_morph_counts(datadir, baseline):
+    if baseline is True:
+        processed_dir = os.path.join(os.path.split(datadir)[0], 'processed_premorphs')
+    else:
+        processed_dir = os.path.join(os.path.split(datadir)[0], 'processed')
 
-    processed_dir = os.path.join(os.path.split(datadir)[0], 'processed')
     animals = os.listdir(processed_dir)
     animals = [i for i in animals if i.endswith('.pkl')]
 
@@ -591,6 +646,7 @@ def get_choice_matlab(P):
         data[animal][:,1] = np.flipud(data[animal][:,1])
         data[animal][:,2] = np.flipud(data[animal][:,2])
 
+        print data
     return data
 
     # [ 0.94736842,  0.89189189,  0.92105263,  0.91891892,  0.94594595,
@@ -710,28 +766,32 @@ def convert(input):
 datadir = sys.argv[1]   
 
 if __name__ == "__main__":
-    get_trials_by_session(datadir)
-    P = get_morph_stats(datadir, show_curve=False)
+    print "BASELINE: ", baseline
+    get_trials_by_session(datadir, baseline)
+    P = get_morph_stats(datadir, baseline, show_curve=False)
 
     # Use SUCCESS as measure: 
-    mdata = get_success_matlab(P)
-    umdata = convert(mdata)
+    # mdata = get_success_matlab(P)
+    # umdata = convert(mdata)
 
-    fn = 'P_success.mat'
-    outpath = os.path.join(os.path.split(datadir)[0], 'matfiles')
-    if not os.path.exists(outpath):
-        os.makedirs(outpath)
+    # fn = 'P_success.mat'
+    # outpath = os.path.join(os.path.split(datadir)[0], 'matfiles')
+    # if not os.path.exists(outpath):
+    #     os.makedirs(outpath)
 
-    outfile = os.path.join(outpath, fn)
+    # outfile = os.path.join(outpath, fn)
 
-    scipy.io.savemat(outfile, mdict={'mdata': mdata})
+    # scipy.io.savemat(outfile, mdict={'mdata': mdata})
 
 
     # Use CHOICE as measure 
     mdata = get_choice_matlab(P)
     umdata = convert(mdata)
 
-    fn = 'P_choice.mat'
+    if baseline is True:
+        fn = 'P_choice_premorphs.mat'
+    else:
+        fn = 'P_choice.mat'
     outpath = os.path.join(os.path.split(datadir)[0], 'matfiles')
     if not os.path.exists(outpath):
         os.makedirs(outpath)
