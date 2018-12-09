@@ -24,10 +24,12 @@ import itertools
 import functools
 
 import logging
-import datautils
+#import datautils
 import numpy as np
 
 import re
+import matplotlib
+matplotlib.use('agg')
 import matplotlib.pyplot as plt
 
 
@@ -368,9 +370,11 @@ def analyze_sessions(datadir):
 # do stuff...
 ###############################################################################
 
-
-datadir = sys.argv[1]                                                           # data INPUT folder (all others are soft-coded relative to this one)
-plot = 1
+def main(datadir):
+    plot = 1
+    analyze_sessions(datadir)   
 
 if __name__ == "__main__":
-    analyze_sessions(datadir)
+    #datadir = sys.argv[1]  # data INPUT folder (all others are soft-coded relative to this one)
+    main(sys.argv[1])
+
