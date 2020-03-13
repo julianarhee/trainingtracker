@@ -98,12 +98,21 @@ def main(options):
             A = processd.process_sessions_for_animal(animalid, session_meta, paradigm=paradigm, n_processes=n_processes,
                                           create_new=create_new, plot_each_session=plot_each_session)
             print("[%s] - done processing! -" % animalid)
+            print("[%s] - creating dataframe" % animalid)
+
+            df, new_s, no_trials = processd.get_animal_df(animalid, paradigm, metadata, create_new=True, rootdir=rootdir)    
+ 
     else:
         print('[%s] - starting processing...' % animalid)
         A = processd.process_sessions_for_animal(animalid, metadata, paradigm=paradigm, n_processes=n_processes,
                                           create_new=create_new, plot_each_session=plot_each_session)
         print("[%s] - done processing! -" % animalid)
-    
+        
+        print("[%s] - creating dataframe" % animalid)
+        df, new_s, no_trials = processd.get_animal_df(animalid, paradigm, metadata, create_new=True, rootdir=rootdir)    
+   
+    print("~~~ done! ~~~")
+ 
     return A
 
 if __name__ == '__main__':
