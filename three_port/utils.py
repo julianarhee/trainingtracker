@@ -395,7 +395,8 @@ def process_session(session_meta, dst_dir='/tmp',
 
     # Check if session data exists
     tmp_file_dir = os.path.join(dst_dir_figures, 'tmp_files')
-    if not os.path.exists(tmp_file_dir): os.makedirs(tmp_file_dir)
+    if not os.path.exists(tmp_file_dir):
+        os.makedirs(tmp_file_dir)
     tmp_processed_file = os.path.join(tmp_file_dir, 'proc_%s_%s.pkl' % (S.animalid, S.session))
     parse_data=False
     if os.path.exists(tmp_processed_file) and (create_new is False):
