@@ -528,11 +528,11 @@ def parse_trials(dfn, response_types=['Announce_AcquirePort1', 'Announce_Acquire
                 tmp_flags[flag] = found_values
             #    tmp_flags.pop(flag)
         
-        # Add current flag values to flags list:
-        flag_list.append(tmp_flags)
+#         # Add current flag values to flags list:
+#         flag_list.append(tmp_flags)
         
-        # Add boundary time to flag info:
-        tmp_flags.update({'run_bounds': bound})
+#         # Add boundary time to flag info:
+#         tmp_flags.update({'run_bounds': bound})
         
         # Check for valid response types and get all response events:
         response_types = [r for r in response_types if r in codec.values()]
@@ -575,7 +575,15 @@ def parse_trials(dfn, response_types=['Announce_AcquirePort1', 'Announce_Acquire
         
         # Add current trials in chunk to trials list:
         trials.extend(tmp_trials)
+        
+    if len(tmp_trials) > 0:
+        # Add current flag values to flags list:
+        flag_list.append(tmp_flags)
 
+        # Add boundary time to flag info:
+        tmp_flags.update({'run_bounds': bound})
+
+        
     if len(trials) == 0:
         return trials, flags, df
     
@@ -622,14 +630,14 @@ def parse_trials(dfn, response_types=['Announce_AcquirePort1', 'Announce_Acquire
             flags = copy.copy(flag_dict)
         else:
             for flag_name, flag_value in flag_dict.items():
+                print(flag_name, flag_value)
                 existing_value = flags[flag_name] #.value()
                 if flag_value == existing_value:
                     continue
                 if not isinstance(flags[flag_name], list):
-                    flags[flag_name] = list(flags[flag_name])
+                    flags[flag_name] = [flags[flag_name]]
                 flags[flag_name].append(flag_value)
-
-
+            
     return trials, flags, df
 
 def to_trials(stim_display_events, outcome_events, outcome_key='outcome',
