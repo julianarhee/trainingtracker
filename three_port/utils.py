@@ -516,14 +516,17 @@ def parse_trials(dfn, response_types=['Announce_AcquirePort1', 'Announce_Acquire
         tmp_flags = dict((flag, None) for flag in flag_names)
         for flag in flag_names:
             if flag == 'FlagNoFeedbackInCurrentTrial': continue
-            found_values = [e.value for e in df.get_events(flag) if bound[0] <= e.time <=bound[1]]
-            if (len(found_values) > 1) or (len(list(set(found_values)))) > 1:
+            found_values = np.unique([e.value for e in df.get_events(flag) if bound[0] <= e.time <=bound[1]])
+            if (len(found_values) > 1) > 1: #or (len(list(set(found_values)))) > 1:
                 print("More than 1 value found for flag: %s" % flag)
-                tmp_flags[flag] = int(found_values[-1])
-            elif (len(found_values) == 1) or (len(list(set(found_values)))) == 1:
+                # Take last value
+                last_found_val = [e.value for e in sorted(df.get_events(flag), key=lambda x: x.time)][-1]
+                tmp_flags[flag] = int(last_found_val)
+            elif (len(found_values) == 1): # or (len(list(set(found_values)))) == 1:
                 tmp_flags[flag] = int(found_values[0])
             else:
-                tmp_flags.pop(flag)
+                tmp_flags[flag] = found_values
+            #    tmp_flags.pop(flag)
         
         # Add current flag values to flags list:
         flag_list.append(tmp_flags)
