@@ -150,7 +150,11 @@ def process_sessions_for_animal(animalid, metadata, n_processes=1, plot_each_ses
 
 
 def get_animal_df(animalid, paradigm, metadata, create_new=False, rootdir='/n/coxfs01/behavior-data'):
-    
+   
+    new_sessions=[]
+    no_trials = []
+    df = None
+
     # Check for dataframe
     outdir = os.path.join(rootdir, paradigm, 'processed', 'data')
     if not os.path.exists(outdir):
@@ -164,7 +168,6 @@ def get_animal_df(animalid, paradigm, metadata, create_new=False, rootdir='/n/co
         print("... loading existing df")
         with open(d_outfile, 'rb') as f:
             df = pkl.load(f)
-        new_sessions=[]
     else:
         reload_df = True
 
