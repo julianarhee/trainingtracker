@@ -93,9 +93,11 @@ class Session():
             if len(tmp_flags) > 0:
                 flags = dict((fkey, []) for fkey in tmp_flags[0].keys())
                 for tmp_flag in tmp_flags:
-                    for flag_key, flag_value in tmp_flag.iteritems():
+                    for flag_key, flag_value in tmp_flag.items():
                         if flag_key not in flags.keys():
                             flags[flag_key] = []
+                        if not isinstance(flags[flag_key], list):
+                            flags[flag_key] = [flags[flag_key]]
                         if flag_value not in flags[flag_key]:
                             flags[flag_key].append(flag_value)
         else:
@@ -206,7 +208,7 @@ class Session():
         if counts is not None:
             values = [('%s_%s' % ('_'.join(stim.split('_')[0:2]), stim.split('_')[3]), \
                        counts[stim]['nsuccess']/float(counts[stim]['ntrials'])) for stim in stimulus_list]
-            print values
+            #print values
 
             pl.figure()
             if 'CamRot' in stimulus_list[0]:
@@ -327,7 +329,7 @@ def get_run_time(df):
 
 
 def process_sessions_mp(new_sessions, session_meta, dst_dir='/tmp',
-                         n_processes=1, plot_each_session=True,
+                         n_processes=1, plot_each_session=False,
                          ignore_flags=None,
                          response_types=['Announce_AcquirePort1', 'Announce_AcquirePort3', 'ignore'],
                          outcome_types = ['success', 'ignore', 'failure'], create_new=False):
@@ -394,7 +396,7 @@ def process_sessions_mp(new_sessions, session_meta, dst_dir='/tmp',
 def process_session(session_meta, dst_dir='/tmp',
                     response_types=['Announce_AcquirePort1', 'Announce_AcquirePort3', 'ignore'],
                     outcome_types=['success', 'ignore', 'failure'],
-                    ignore_flags=None, create_new=False, plot_each_session=True):
+                    ignore_flags=None, create_new=False, plot_each_session=False):
 
     # Create session object from meta (quick)
     S = Session(session_meta) 
@@ -576,12 +578,12 @@ def parse_trials(dfn, response_types=['Announce_AcquirePort1', 'Announce_Acquire
         # Add current trials in chunk to trials list:
         trials.extend(tmp_trials)
         
-    if len(tmp_trials) > 0:
-        # Add current flag values to flags list:
-        flag_list.append(tmp_flags)
+        if len(tmp_trials) > 0:
+            # Add current flag values to flags list:
+            flag_list.append(tmp_flags)
 
-        # Add boundary time to flag info:
-        tmp_flags.update({'run_bounds': bound})
+            # Add boundary time to flag info:
+            tmp_flags.update({'run_bounds': bound})
 
         
     if len(trials) == 0:

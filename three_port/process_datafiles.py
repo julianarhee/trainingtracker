@@ -97,7 +97,7 @@ def load_animal_data(animalid, paradigm, metadata, rootdir='/n/coxfs01/behavior-
     return A, new_sessions
 
 
-def process_sessions_for_animal(animalid, metadata, n_processes=1, plot_each_session=True,
+def process_sessions_for_animal(animalid, metadata, n_processes=1, plot_each_session=False,
                                paradigm='threeport', create_new=False,
                                response_types=['Announce_AcquirePort1', 'Announce_AcquirePort3', 'ignore'],
                                outcome_types=['success', 'ignore', 'failure'],

@@ -43,9 +43,9 @@ def extract_options(options):
             help='N processes to use (default:  1)')
 
 
-    parser.add_option('--plot-session', action='store_true', dest='plot_each_session', default=True, 
+    parser.add_option('--plot-session', action='store_true', dest='plot_each_session', default=False, 
             help='flag to plot performance for each sessions')
-    parser.add_option('--new', action='store', dest='create_new', default=False, 
+    parser.add_option('--new', action='store_true', dest='create_new', default=False, 
             help='flag to reprocess sessions anew')
     parser.add_option('--meta', action='store_true', dest='create_meta', default=False, 
             help='flag to recreate metadata (if adding new datafiles)')
@@ -70,6 +70,7 @@ def main(options):
         process_cohort = False
 
     n_processes = int(opts.n_processes)
+    print("***running on %i processes" % n_processes)
  
     create_new = opts.create_new
     create_meta = opts.create_meta
