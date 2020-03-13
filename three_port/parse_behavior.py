@@ -570,12 +570,27 @@ def parse_trials(dfn, response_types=['Announce_AcquirePort1', 'Announce_Acquire
         stimname = t['name'].split(' ')[0].split('.png')[0]
         t['name'] = stimname
         # Can be: Blob_1_RotDep_0, Blob_N2_CamRot_y-45
-        drot_str = stimname.split('_')[-1]
-        if 'y' in drot_str:
-            rot_value = int(drot_str[1:])
-        else:
-            rot_value = int(drot_str)
-        t['depth_rotation'] = rot_value #Blob_N2_CamRot_y-45
+        
+        if 'RotDep' in stimname:
+            drot_str = stimname.split('_')[-1]
+            depthrot_value = int(drot_str)
+            t['depth_rotation'] = depthrot_value #Blob_N2_CamRot_y-45
+        elif 'CamRot' in stimname and 'LighPos' in stimname:
+            depthrot_value = int(stimname.split('CamRot_y')[1].split('_')[0])
+            lightpos_value = tuple([int(i) for i in re.findall("[-\d]+", stimname.split('LighPos')[1])])
+            t['depth_rotation'] = depthrot_value #Blob_N2_CamRot_y-45
+            t['light_position'] = lightpos_value
+        elif 'CamRot' in stimname:
+            depthrot_value = int(stimname.split('CamRot_y')[1].split('_')[0])
+            t['depth_rotation'] = depthrot_value #Blob_N2_CamRot_y-45
+        elif 'morph' in stimname:
+            t['depth_rotation']=0
+            
+#         if 'y' in drot_str:
+#             depthrot_value = int(drot_str[1:])
+#         else:
+#             depthrot_value = int(drot_str)
+                    
         t['size'] = round(t['size_x']/stim_aspect, 1)
 
         # Check if no feedback

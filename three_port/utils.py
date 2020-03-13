@@ -72,10 +72,9 @@ def parse_datafiles_for_animal(animalid, metadata, n_processes=1,
     print("ANIMAL:  %s" % animalid)
     print("***********************************************")
     
-    cohort = metadata[metadata.animalid==animalid]['cohort'].unique()[0]
-
-    # Get current animal session info:
+    # --- Get current animal session info:
     A = pb.Animal(animalid=animalid, experiment=paradigm) #, output_datadir=output_datadir)
+    cohort = metadata[metadata.animalid==animalid]['cohort'].unique()[0]
     curr_processed_dir = os.path.join(root, paradigm, 'cohort_data', cohort, 'processed')
 
     # --- Create or load animal datafile:
@@ -94,24 +93,26 @@ def parse_datafiles_for_animal(animalid, metadata, n_processes=1,
     # --- Process new datafiles / sessions:
     all_sessions = metadata[metadata.animalid==animalid]['session'].values
     old_sessions = [skey for skey, sobject in A.sessions.items() if sobject is not None]
-    print("[%s]: Found %i processed sessions." % (animalid, len(old_sessions)))
+    print("[%s]: Loaded %i processed sessions." % (A.animalid, len(old_sessions)))
     new_sessions = [s for s in all_sessions if s not in old_sessions]
-    print("[%s]: There are %i out of %i found session datafiles to process." % (A.animalid, len(new_sessions), len(all_sessions)))
+    print("[%s]: Found %i out of %i total sessions to process." % (A.animalid, len(new_sessions), len(all_sessions)))
 
-    # Process all new sessions:
+    # --- process.
+    start_t = time.time()
     session_meta = metadata[(metadata.animalid==animalid)] # & (metadata.session==session)]
     processed_sessions = pb.process_sessions_mp(new_sessions, session_meta,
-                                             #dst_dir=output_figdir,
                                              nprocesses=n_processes,
                                              ignore_flags=ignore_flags,
                                              response_types=response_types,
                                              outcome_types=outcome_types, create_new=create_new)
+    end_t = time.time() - start_t
+    print("--> Elapsed time: {0:.2f}sec".format(end_t))
 
-    # Update animal sessions dict:
+    # --- Update animal sessions dict:
     for datestr, S in processed_sessions.items():
         A.sessions.update({datestr: S})
 
-    # Save to disk:
+    # --- Save to disk:
     try:
         with open(animal_datafile, 'wb') as f:
             pkl.dump(A, f, protocol=pkl.HIGHEST_PROTOCOL)
@@ -122,7 +123,6 @@ def parse_datafiles_for_animal(animalid, metadata, n_processes=1,
             curr_sessionmeta = session_meta[session_meta.session==session] #session_info[datestr]
             S = pd.process_session(curr_sessionmeta)
             A.sessions[session] = S
-
         with open(animal_datafile, 'wb') as f:
             pkl.dump(A, f, protocol=pkl.HIGHEST_PROTOCOL)
 
