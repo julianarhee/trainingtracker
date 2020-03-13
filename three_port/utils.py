@@ -590,7 +590,7 @@ def parse_trials(dfn, response_types=['Announce_AcquirePort1', 'Announce_Acquire
 
         # Check if no feedback
         if always_feedback:
-            t['no_feedback'] = True
+            t['no_feedback'] = False
         else:
             t['no_feedback'] = all([np.min(lims) < t[k] < np.max(lims) for k, lims in no_fb.items()])
 
