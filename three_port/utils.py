@@ -79,8 +79,8 @@ class Session():
         #### Parse trials and outcomes
         trials = []
         flags = {}
+        tmp_flags = []
         if isinstance(self.source, list) and len(self.source) > 1:
-            tmp_flags = []
             for dfn in self.source:
                 curr_trials, curr_flags, df = parse_trials(dfn, response_types=response_types, 
                                                        outcome_types=outcome_types,
@@ -88,7 +88,7 @@ class Session():
                 if curr_trials is not None:
                     trials.extend(curr_trials)
                     tmp_flags.append(curr_flags)
-
+                    
             # Combine flag values across data files:
             if len(tmp_flags) > 0:
                 flags = dict((fkey, []) for fkey in tmp_flags[0].keys())
