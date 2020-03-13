@@ -412,8 +412,7 @@ def process_session(session_meta, dst_dir='/tmp',
 
     # Check if session data exists
     tmp_file_dir = os.path.join(dst_dir_figures, 'tmp_files')
-    if not os.path.exists(tmp_file_dir):
-        os.makedirs(tmp_file_dir)
+    if not os.path.exists(tmp_file_dir): os.makedirs(tmp_file_dir)
     tmp_processed_file = os.path.join(tmp_file_dir, 'proc_%s_%s.pkl' % (S.animalid, S.session))
     parse_data=False
     if os.path.exists(tmp_processed_file) and (create_new is False):
@@ -459,16 +458,17 @@ def parse_trials(dfn, response_types=['Announce_AcquirePort1', 'Announce_Acquire
     print "***** Parsing trials *****"
     df = pymworks.open(dfn)
     
-    # Separate behavior-training flag states from current trial states
-    if ignore_flags is None or len(ignore_flags)==0:
-        codec = df.get_codec()
-        ignore_flags = []
-        all_flags = [f for f in codec.values() if 'Flag' in f or 'flag' in f]
-        for fl in all_flags:
-            evs = df.get_events(fl)
-            vals = list(set([v.value for v in evs]))
-            if len(vals) > 1 or len(evs) > 5:
-                ignore_flags.append(fl)
+#     # Separate behavior-training flag states from current trial states
+    ignore_flags = []
+#     if ignore_flags is None or len(ignore_flags)==0:
+#         codec = df.get_codec()
+#         ignore_flags = []
+#         all_flags = [f for f in codec.values() if 'Flag' in f or 'flag' in f]
+#         for fl in all_flags:
+#             evs = df.get_events(fl)
+#             vals = list(set([v.value for v in evs]))
+#             if len(vals) > 1 or len(evs) > 5:
+#                 ignore_flags.append(fl)
         
     # Get run bounds:
     bounds = get_run_time(df)
@@ -510,6 +510,8 @@ def parse_trials(dfn, response_types=['Announce_AcquirePort1', 'Announce_Acquire
         # Get behavior flags:
         codec = df.get_codec()
         all_flags = [f for f in codec.values() if 'Flag' in f or 'flag' in f]
+        ignore_flags_with_name = ['Curr', 'current', 'Current', 'curr']
+        ignore_flags = [f for f in all_flags if any([fstr in f for fstr in ignore_flags_with_name])]
         flag_names = [f for f in all_flags if f not in ignore_flags]
         tmp_flags = dict((flag, None) for flag in flag_names)
         for flag in flag_names:
