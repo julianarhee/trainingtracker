@@ -327,7 +327,7 @@ def get_run_time(df):
 
 
 def process_sessions_mp(new_sessions, session_meta, dst_dir='/tmp',
-                         nprocesses=1, plot_each_session=True,
+                         n_processes=1, plot_each_session=True,
                          ignore_flags=None,
                          response_types=['Announce_AcquirePort1', 'Announce_AcquirePort3', 'ignore'],
                          outcome_types = ['success', 'ignore', 'failure'], create_new=False):
@@ -349,9 +349,9 @@ def process_sessions_mp(new_sessions, session_meta, dst_dir='/tmp',
     
     # Get a chunksize of sessions to process and queue for outputs:
     out_q = mp.Queue()
-    chunksize = int(math.ceil(len(new_sessions) / float(nprocesses)))
+    chunksize = int(math.ceil(len(new_sessions) / float(n_processes)))
     procs = []
-    for i in range(nprocesses):
+    for i in range(n_processes):
         p = mp.Process(target=parser,
                       args=(new_sessions[chunksize * i:chunksize * (i + 1)],
                            session_meta, 
@@ -367,7 +367,7 @@ def process_sessions_mp(new_sessions, session_meta, dst_dir='/tmp',
         
     # Collect all results into single dict:
     processed_dict = {}
-    for i in range(nprocesses):
+    for i in range(n_processes):
         processed_dict.update(out_q.get())
     
     # Wait for all worker processes to finish:

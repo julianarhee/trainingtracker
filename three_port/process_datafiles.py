@@ -99,26 +99,32 @@ def load_animal_data(animalid, paradigm, metadata, rootdir='/n/coxfs01/behavior-
 
 def process_sessions_for_animal(animalid, metadata, n_processes=1, plot_each_session=True,
                                paradigm='threeport', create_new=False,
+                               response_types=['Announce_AcquirePort1', 'Announce_AcquirePort3', 'ignore'],
+                               outcome_types=['success', 'ignore', 'failure'],
+                               ignore_flags=None,
                                rootdir='/n/coxfs01/behavior-data'):
 
     # Set experiment parsing vars and params:
-    response_types = ['Announce_AcquirePort1', 'Announce_AcquirePort3', 'ignore']
-    outcome_types = outcome_types = ['success', 'ignore', 'failure']
-    ignore_flags = None
-
+#    response_types = ['Announce_AcquirePort1', 'Announce_AcquirePort3', 'ignore']
+#    outcome_types = outcome_types = ['success', 'ignore', 'failure']
+#    ignore_flags = None
+#
     print("***********************************************")
     print("ANIMAL:  %s" % animalid)
     print("***********************************************")
     
     # --- Get current animal session info:
-    session_meta = metadata[metadata.animalid==animalid].copy()
+    session_meta = metadata[metadata['animalid']==animalid].copy()
     A, new_sessions = load_animal_data(animalid, paradigm, session_meta, rootdir=rootdir)
 
     # --- process.
     start_t = time.time()
-    session_meta = metadata[(metadata.animalid==animalid)] # & (metadata.session==session)]
+    session_meta = metadata[(metadata['animalid']==animalid)] # & (metadata.session==session)]
+    if create_new:
+        print("!!! (Re)processing all sessions.")
+        new_sessions = session_meta['session'].unique()
     processed_sessions = util.process_sessions_mp(new_sessions, session_meta,
-                                             nprocesses=n_processes, plot_each_session=plot_each_session,
+                                             n_processes=n_processes, plot_each_session=plot_each_session,
                                              ignore_flags=ignore_flags,
                                              response_types=response_types,
                                              outcome_types=outcome_types, create_new=create_new)
