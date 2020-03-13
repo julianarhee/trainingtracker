@@ -272,40 +272,57 @@ def parse_datafile_name(dfn):
 
 
 def get_run_time(df):
+    
     '''
     When was the session running?
     '''
-    state_modes = df.get_events('#state_system_mode')
-    run_bounds = None
     
+    no_stop_mode = False
+    state_modes = df.get_events('#state_system_mode')
+    state_modes = sorted(state_modes, key=lambda x: x.time)
+    if state_modes[-1].value == 2:
+        no_stop_mode = True
+
+    run_bounds = None
+
     while True:
         try:
             running = next(d for d in state_modes if d.value==2)
             start_time = running.time
             strt = state_modes.index(running)
         except StopIteration:
+            #break
             return run_bounds
-
-        try:
-            stopping = next(d for d in state_modes[strt:] if d.value != 2) 
-            end_time = stopping.time
-            stp = state_modes.index(stopping)
-        except StopIteration:
+        print("-- finding stop")
+        if no_stop_mode:
             end_time = df.get_maximum_time()
-            stp = 0
-
-        if run_bounds is None:
-            run_bounds = []
-        run_bounds.append((start_time, end_time))
-
-        # Check if there are additional run chunks:
-        remaining_state_evs = state_modes[stp:]
-        additional_starts = [s for s in remaining_state_evs if s.value == 2]
-        if len(additional_starts) > 0:
-            state_modes = remaining_state_evs
-        else:
+            stp = strt
+            if run_bounds is None:
+                run_bounds = []
+            run_bounds.append((start_time, end_time))
             break
-        
+        else:
+            stp = strt
+            try:
+                stopping = next(d for d in state_modes[strt:] if d.value != 2) 
+                end_time = stopping.time
+                stp = state_modes.index(stopping)
+            except StopIteration:
+                end_time = df.get_maximum_time()
+                #stp = 0
+
+            if run_bounds is None:
+                run_bounds = []
+            run_bounds.append((start_time, end_time))
+
+            # Check if there are additional run chunks:
+            remaining_state_evs = state_modes[stp:]
+            additional_starts = [s for s in remaining_state_evs if s.value == 2]
+            if len(additional_starts) > 0:
+                state_modes = remaining_state_evs
+            else:
+                break
+
     return run_bounds
 
 
