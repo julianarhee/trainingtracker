@@ -47,7 +47,7 @@ def extract_options(options):
             help='flag to plot performance for each sessions')
     parser.add_option('--new', action='store', dest='create_new', default=False, 
             help='flag to reprocess sessions anew')
-    parser.add_option('--meta', action='store', dest='create_meta', default=False, 
+    parser.add_option('--meta', action='store_true', dest='create_meta', default=False, 
             help='flag to recreate metadata (if adding new datafiles)')
 
     (options, args) = parser.parse_args(options)
@@ -91,7 +91,9 @@ def main(options):
     #### Load metadata
     metadata = processd.get_metadata(paradigm, create_meta=create_meta)
 
+    A = None
     if process_cohort:
+        print("-- processing cohort: %s" % cohort)
         #### Process current animal
         for animalid, session_meta in metadata[metadata['cohort']==cohort].groupby(['animalid']):
             print('[%s] - starting processing...' % animalid)
