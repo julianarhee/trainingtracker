@@ -87,10 +87,11 @@ def load_animal_data(animalid, paradigm, metadata, rootdir='/n/coxfs01/behavior-
     print("outfile: %s" % A.path)
     
     # --- Process new datafiles / sessions:
-    all_sessions = metadata[metadata.animalid==animalid]['session'].values
+    all_sessions = metadata[metadata.animalid==animalid]['session'].unique() #.values
     old_sessions = [int(skey) for skey, sobject in A.sessions.items() if sobject is not None]
-    print("[%s]: Loaded %i processed sessions." % (animalid, len(old_sessions)))
-    new_sessions = [s for s in all_sessions if s not in old_sessions]
+    none_sessions = [int(skey) for skey, sobject in A.sessions.items() if sobject is None]
+    print("[%s]: Loaded %i processed sessions (+%i are None)." % (animalid, len(old_sessions), len(none_sessions)))
+    new_sessions = [s for s in all_sessions if s not in old_sessions and s not in none_sessions]
     print("[%s]: Found %i out of %i sessions to process." % (A.animalid, len(new_sessions), len(all_sessions)))
     
     return A, new_sessions
@@ -139,7 +140,7 @@ def process_sessions_for_animal(animalid, metadata, n_processes=1, plot_each_ses
             curr_sessionmeta = session_meta[session_meta.session==session] #session_info[datestr]
             S = pd.process_session(curr_sessionmeta)
             A.sessions[session] = S
-        with open(animal_datafile, 'wb') as f:
+        with open(A.path, 'wb') as f:
             pkl.dump(A, f, protocol=pkl.HIGHEST_PROTOCOL)
 
     print("[%s] ~~~ processing complete! ~~~" % A.animalid)
@@ -148,15 +149,18 @@ def process_sessions_for_animal(animalid, metadata, n_processes=1, plot_each_ses
 
 
 
-def get_animal_df(animalid, paradigm, metadata, rootdir='/n/coxfs01/behavior-data'):
+def get_animal_df(animalid, paradigm, metadata, create_new=False, rootdir='/n/coxfs01/behavior-data'):
     
     # Check for dataframe
-    outdir = os.path.join(rootdir, paradigm, 'processed')
+    outdir = os.path.join(rootdir, paradigm, 'processed', 'data')
+    if not os.path.exists(outdir):
+        os.makedirs(outdir)
+    print(outdir)
     d_outfile = os.path.join(outdir, 'df_%s.pkl' % animalid)
     print(d_outfile)
     
     reload_df = False
-    if os.path.exists(d_outfile):
+    if os.path.exists(d_outfile) and create_new is False:
         print("... loading existing df")
         with open(d_outfile, 'rb') as f:
             df = pkl.load(f)
@@ -166,23 +170,29 @@ def get_animal_df(animalid, paradigm, metadata, rootdir='/n/coxfs01/behavior-dat
 
     if reload_df:
         print("... making dataframe for %s" % animalid)
-        df, new_sessions = sessiondata_to_df(A, rootdir=rootdir)
-        
-    return df, new_sessions
+        df, new_sessions, no_trials = sessiondata_to_df(animalid, paradigm, metadata, rootdir=rootdir)
+        with open(d_outfile, 'wb') as f:
+            pkl.dump(df, f, protocol=pkl.HIGHEST_PROTOCOL)
+
+    return df, new_sessions, no_trials
 
 
-def sessiondata_to_df(animalid, paradigm, metadata, rootdir='/n/coxfs01/behavior-data'):
+def sessiondata_to_df(animalid, paradigm, metadata, rootdir='/n/coxfs01/behavior-data',
+                      event_names=['outcome', 'time', 'response', 'no_feedback', 'response_time', 'duration', 
+                                    'pos_x', 'pos_y', 'rotation', 'size', 'depth_rotation', 'light_position', 'name']):
     
-    A, new_sessions = processd.load_animal_data(animalid, paradigm, metadata, rootdir=rootdir)
+    A, new_sessions = load_animal_data(animalid, paradigm, metadata, rootdir=rootdir)
     if len(new_sessions)> 0:
         print("[%s] There are %i new sessions to analyze..." % (animalid, len(new_sessions)))
 
-
     dflist = []
     no_trials = []
-    for sess, s in A.sessions.items():
+    for si, (sess, s) in enumerate(A.sessions.items()):
+        if si % 20 == 0:
+            print("... adding %i of %i sessions." % (int(si+1), len(A.sessions)))
+
         if s is None or s.trials is None or len(s.trials)==0:
-            no_trials.append(s)
+            no_trials.append(sess)
             continue
 
         tmpd=[]
@@ -201,7 +211,7 @@ def sessiondata_to_df(animalid, paradigm, metadata, rootdir='/n/coxfs01/behavior
         dflist.append(tmpdf)
 
     df = pd.concat(dflist, axis=0)
-    with open(d_outfile, 'wb') as f:
-        pkl.dump(df, f, protocol=pkl.HIGHEST_PROTOCOL)
+    print('%i sessions have no trials' % len(no_trials))
 
-    return df, new_sessions
+
+    return df, new_sessions, no_trials

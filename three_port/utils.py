@@ -381,7 +381,8 @@ def process_session(session_meta, dst_dir='/tmp',
 
     # Create session object from meta (quick)
     S = Session(session_meta) 
-   
+    print("*[%s] processing session %i" % (S.animalid, S.session))
+
     # Create output dir for processed data
     src_dir = S.source[0] if isinstance(S.source, list) else S.source
 
@@ -390,7 +391,7 @@ def process_session(session_meta, dst_dir='/tmp',
         dst_dir_figures = os.path.join(dst_dir, 'figures')
         if not os.path.exists(dst_dir_figures):
             os.makedirs(dst_dir_figures)
-    print("Saving processed output to: %s" % dst_dir)
+    #print("Saving processed output to: %s" % dst_dir)
 
     # Check if session data exists
     tmp_file_dir = os.path.join(dst_dir_figures, 'tmp_files')
