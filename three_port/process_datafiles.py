@@ -194,6 +194,7 @@ def sessiondata_to_df(animalid, paradigm, metadata, rootdir='/n/coxfs01/behavior
     if len(new_sessions)> 0:
         print("[%s] There are %i new sessions to analyze..." % (animalid, len(new_sessions)))
 
+    df = None
     dflist = []
     no_trials = []
     for si, (sess, s) in enumerate(A.sessions.items()):
@@ -219,7 +220,8 @@ def sessiondata_to_df(animalid, paradigm, metadata, rootdir='/n/coxfs01/behavior
         tmpdf['session'] = [sess for _ in np.arange(0, len(tmpd))]
         dflist.append(tmpdf)
 
-    df = pd.concat(dflist, axis=0)
+    if len(dflist) > 0:
+        df = pd.concat(dflist, axis=0)
     print('%i sessions have no trials' % len(no_trials))
 
 
