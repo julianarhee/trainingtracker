@@ -195,34 +195,24 @@ def sessiondata_to_df(animalid, paradigm, metadata, rootdir='/n/coxfs01/behavior
         print("[%s] There are %i new sessions to analyze..." % (animalid, len(new_sessions)))
 
     df = None
-    dflist = []
+    sessionlist = []
     no_trials = []
-    for si, (sess, s) in enumerate(A.sessions.items()):
+    for si, (session, sessionobj) in enumerate(A.sessions.items()):
         if si % 20 == 0:
             print("... adding %i of %i sessions." % (int(si+1), len(A.sessions)))
 
-        if s is None or s.trials is None or len(s.trials)==0:
-            no_trials.append(sess)
+        if sessionobj is None or sessionobj.trials is None or len(sessionobj.trials)==0:
+            no_trials.append(session)
             continue
 
-        tmpd=[]
-        for ti, trial in enumerate(s.trials):
-            currvalues = dict((k, 0) for k in event_names)
-            got_keys = [k for k, v in trial.items() if k in event_names]
-            for k in got_keys:
-                if isinstance(trial[k], tuple): #len(trial[k])>1:
-                    currvalues[k] = '_'.join([str(i) for i in trial[k]])
-                else:
-                    currvalues[k] = trial[k]
-            tmpd.append(pd.DataFrame(currvalues, index=[ti]))
-        tmpdf = pd.concat(tmpd, axis=0)
-        tmpdf['response_time'] = (tmpdf['response_time']-tmpdf['time']) / 1E6
-        tmpdf['session'] = [sess for _ in np.arange(0, len(tmpd))]
-        dflist.append(tmpdf)
-
-    if len(dflist) > 0:
-        df = pd.concat(dflist, axis=0)
+        trialdf = util.trialdict_to_dataframe(sessionobj.trials, session=session)
+        if trialdf is not None:
+            sessionlist.append(trialdf)
+            
+    if len(sessionlist) > 0:
+        df = pd.concat(sessionlist, axis=0)
     print('%i sessions have no trials' % len(no_trials))
 
 
     return df, new_sessions, no_trials
+

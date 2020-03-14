@@ -101,9 +101,17 @@ def main(options):
             A = processd.process_sessions_for_animal(animalid, session_meta, paradigm=paradigm, n_processes=n_processes,
                                           create_new=create_new, plot_each_session=plot_each_session)
             print("[%s] - done processing! -" % animalid)
-            print("[%s] - creating dataframe" % animalid)
 
-            df, new_s, no_trials = processd.get_animal_df(animalid, paradigm, metadata, create_new=True, rootdir=rootdir)    
+            print("[%s] - creating dataframe" % animalid)
+            outdir = os.path.join(rootdir, paradigm, 'processed', 'data')
+            if not os.path.exists(outdir):
+                os.makedirs(outdir)
+            d_outfile = os.path.join(outdir, 'df_%s.pkl' % animalid)
+            A, new_sessions = util.format_animal_data(animalid, paradigm, metadata, rootdir=rootdir)
+            df = util.animal_data_to_dataframe(A)
+            with open(d_outfile, 'wb') as f:
+                pkl.dump(df, f, protocol=pkl.HIGHEST_PROTOCOL)
+            #df, new_s, no_trials = processd.get_animal_df(animalid, paradigm, metadata, create_new=True, rootdir=rootdir)    
  
     else:
         print('[%s] - starting processing...' % animalid)
@@ -112,7 +120,17 @@ def main(options):
         print("[%s] - done processing! -" % animalid)
         
         print("[%s] - creating dataframe" % animalid)
-        df, new_s, no_trials = processd.get_animal_df(animalid, paradigm, metadata, create_new=True, rootdir=rootdir)    
+        outdir = os.path.join(rootdir, paradigm, 'processed', 'data')
+        if not os.path.exists(outdir):
+            os.makedirs(outdir)
+        d_outfile = os.path.join(outdir, 'df_%s.pkl' % animalid)
+        A, new_sessions = util.format_animal_data(animalid, paradigm, metadata, rootdir=rootdir)
+        df = util.animal_data_to_dataframe(A)
+        with open(d_outfile, 'wb') as f:
+            pkl.dump(df, f, protocol=pkl.HIGHEST_PROTOCOL)
+
+
+        #df, new_s, no_trials = processd.get_animal_df(animalid, paradigm, metadata, create_new=True, rootdir=rootdir)    
    
     print("~~~ done! ~~~")
  

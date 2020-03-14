@@ -727,3 +727,128 @@ def to_trials(stim_display_events, outcome_events, outcome_key='outcome',
 
     return trials
 
+
+def trialdict_to_dataframe(session_trials, session='YYYYMMDD', rootdir='/n/coxfs01/behavior-data'):
+    
+    trialdf = None
+    dflist = []
+    for ti, trial in enumerate(session_trials):
+        reformat_params = [{param: '_'.join([str(vs) for vs in paramvalue])} \
+                         for param, paramvalue in trial.items() if isinstance(paramvalue, tuple)]
+        for rparam in reformat_params:
+            trial.update(rparam)
+        dflist.append(pd.DataFrame(trial, index=[ti]))
+    if len(dflist) > 0:
+        trialdf = pd.concat(dflist, axis=0)
+        trialdf['response_time'] = (trialdf['response_time']-trialdf['time']) / 1E6
+        trialdf['session'] = [session for _ in np.arange(0, len(dflist))]
+
+    return trialdf
+
+
+def animal_data_to_dataframe(A):
+
+    dflist = []
+    for si, (session, sessionobj) in enumerate(A.sessions.items()):
+        if si % 20 == 0:
+            print("... adding %i of %i sessions." % (int(si+1), len(A.sessions)))
+
+        tmpdf = trialdict_to_dataframe(sessionobj.trials, session=session)
+        if tmpdf is not None:
+            dflist.append(tmpdf)
+
+    df = pd.concat(dflist, axis=0)
+    
+    return df
+
+
+def format_animal_data(animalid, paradigm, metadata, rootdir='/n/coxfs01/behavior-data',
+                      ignore_keys = ['file_hash', 'filename', 'type']):
+
+    training_flag_names = ['FlagAlwaysReward', #
+                           'FlagStaircaseSize',
+                           'FlagStaircaseDeptRotLeft', #
+                           'FlagStaircaseDeptRotRight', 
+                           'FlagShowOnlyTrainedAxes']
+
+    #### Get animal data (all sessions)
+    A, new_sessions = processd.load_animal_data(animalid, paradigm, metadata, rootdir=rootdir)
+
+    #### Clean up empty sessions and reformat flag states
+    exclude_ = [k for k, v in A.sessions.items() if v is None]
+    for session, sessionobj in A.sessions.items():
+        if sessionobj is None:
+            A.sessions.pop(session)
+            continue
+        elif sessionobj.trials is None or len(sessionobj.trials)==0:
+            print(session, 'no trials')
+            A.sessions.pop(session)
+            continue
+
+        for key, val in sessionobj.flags.items():
+            if isinstance(val, list) and len(val)==1:
+                sessionobj.flags[key] = val[0]
+            if key=='run_bounds' and isinstance(val[0], list): # conver back to tuple
+                sessionobj.flags[key] = [tval[0] for tval in val]
+
+
+    #### Assign flag state to each trial
+    multi_phase = []
+    diff_flag_states = {}
+    for session, sessionobj in A.sessions.items():
+        curr_flag_states = dict((k, v) for k, v in sessionobj.flags.items() if k in training_flag_names)
+
+        rm_these_bounds= []
+        diff_flag_lookup = {}
+        same_flag_lookup = {} 
+        for flag_name, flag_value in curr_flag_states.items():
+
+            if hasattr(flag_value, "__len__"):
+                if flag_name not in diff_flag_lookup.keys():
+                    diff_flag_lookup[flag_name] = dict()
+
+                # Make sure these correspond to different run bounds
+                assert len(flag_value) == len(sessionobj.flags['run_bounds']), "%s: %s -- only %i run bounds found." % (flag_name, str(flag_value), len(sessionobj.flags['run_bounds']))
+                if session not in multi_phase:
+                    multi_phase.append(session)
+
+                # Only update trials for flag names w/ differing values in session
+                for rbounds, currval in zip(sessionobj.flags['run_bounds'], flag_value):
+                    tmp_trial_ixs = [ti for ti, trial in enumerate(sessionobj.trials) if rbounds[0] < trial['time'] < rbounds[1]]
+                    print(session, flag_name, currval, len(tmp_trial_ixs))
+                    if len(tmp_trial_ixs) > 0:
+                        diff_flag_lookup[flag_name][currval] = np.array(tmp_trial_ixs)
+                    else:
+                        rm_these_bounds.append(rbounds) # (rbounds, (flag_name, currval)))
+            else:
+                # Save non-changing flag names and values
+                same_flag_lookup.update({flag_name: flag_value})
+
+        diff_flag_states[session] = diff_flag_lookup
+
+        # Update same-flag states only
+        for trial in sessionobj.trials:
+            for flag_name, flag_value in same_flag_lookup.items():
+                trial.update({flag_name: flag_value})
+
+            # While we're here, get rid of fields we don't want for dataframe
+            for ikey in ignore_keys:
+                trial.pop(ikey)
+
+        # Remove bounds if needed:
+        if len(rm_these_bounds) > 0:
+            print("%s, removing %i bounds" % (session, len(rm_these_bounds)))
+            real_bounds = [r for r in A.flags['run_bounds'] if r not in rm_these_bounds]
+            A.flags['run_bounds'] = real_bounds
+
+    # Update sessions with trials in different phases
+    for session in multi_phase:
+        print('[%s] -- updating multi-phase trials' % session)
+        sessionobj = A.sessions[session]    
+        for flag_name, flag_values_dict in diff_flag_states[session].items():
+            #print(flag_name)
+            for curr_flagval, trial_ixs in flag_values_dict.items():
+                for ti in trial_ixs:
+                    sessionobj.trials[ti].update({flag_name: curr_flagval})
+                
+    return A, new_sessions
