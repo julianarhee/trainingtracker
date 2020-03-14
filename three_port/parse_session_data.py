@@ -50,10 +50,10 @@ def extract_options(options):
     parser.add_option('--meta', action='store_true', dest='create_meta', default=False, 
             help='flag to recreate metadata (if adding new datafiles)')
  
-    parser.add_option('--trials', action='store_true', dest='process_trials', default=false, 
+    parser.add_option('--trials', action='store_true', dest='parse_trials', default=False, 
             help='flag to do trial-parsing step for each session (if true, also makes dataframes)')
 
-    parser.add_option('--dfs', action='store_true', dest='make_dataframe', default=false, 
+    parser.add_option('--dfs', action='store_true', dest='make_dataframe', default=False, 
             help='flag to do only create dataframe from processed session data')
 
     (options, args) = parser.parse_args(options)
@@ -81,7 +81,7 @@ def main(options):
     create_new = opts.create_new
     create_meta = opts.create_meta 
     plot_each_session = opts.plot_each_session
-    process_trials = opts.process_trials
+    parse_trials = opts.parse_trials
     make_dataframe = opts.make_dataframe
 
     # Set all output dirs
