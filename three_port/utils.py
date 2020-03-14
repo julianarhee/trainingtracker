@@ -91,19 +91,38 @@ class Session():
                     
             # Combine flag values across data files:
             if len(tmp_flags) > 0:
-                flags = dict((fkey, []) for fkey in tmp_flags[0].keys())
-                for tmp_flag in tmp_flags:
-                    for flag_key, flag_value in tmp_flag.items():
-                        print(flag_key, flag_value)
-                        if flag_key not in flags.keys():
-                            flags[flag_key] = []
-                        if not isinstance(flags[flag_key], list):
-                            flags[flag_key] = [flags[flag_key]]
-                        if hasattr(flag_value, "__len__"):
-                            flags[flag_key].append(flag_value)
-                        else:
-                            if flag_value not in flags[flag_key]:
-                                flags[flag_key].append(flag_value)
+                flags = {
+                    k: [d.get(k) for d in tmp_flags]
+                    for k in set().union(*tmp_flags)
+                }
+            for k, v in flags.items():
+                if k=='run_bounds':
+                    # keep separte so we know when datafile splits happen
+                    continue
+                # Combine single-values and get unique
+                if len(v)>1:
+                    u_vals = np.unique([vv for vv in v])
+                    if len(u_vals)==1:
+                        u_vals=u_vals[0]
+                    flags[k] = u_vals 
+            
+
+#             if len(tmp_flags) > 0:
+#                 flags = dict((fkey, []) for fkey in tmp_flags[0].keys())
+#                 for tmp_flag in tmp_flags:
+#                     for flag_key, flag_value in tmp_flag.items():
+#                         if flag_key not in flags.keys():
+#                             flags[flag_key] = []
+#                         if not hasattr(flags[flag_key], '__len__'):
+#                             flags[flag_key] = [flags[flag_key]]
+#                         if hasattr(flag_value, '__len__'):
+#                             flags[flag_key].append(flag_value)
+#                         else:
+#                             print(flag_key, flag_value)
+#                             print(hasattr(flag_value, '__len__'))
+#                             print(flags[flag_key])
+#                             if all(flag_value not in flags[flag_key]):
+#                                 flags[flag_key].append(flag_value)
         else:
             # Open data file:
             dfn = self.source[0]
@@ -522,8 +541,8 @@ def parse_trials(dfn, response_types=['Announce_AcquirePort1', 'Announce_Acquire
         tmp_flags = dict((flag, None) for flag in flag_names)
         for flag in flag_names:
             if flag == 'FlagNoFeedbackInCurrentTrial': continue
-            found_values = np.unique([e.value for e in df.get_events(flag) if bound[0] <= e.time <=bound[1]])
-            if (len(found_values) > 1) > 1: #or (len(list(set(found_values)))) > 1:
+            found_values = np.unique([e.value for e in df.get_events(flag) if bound[0] < e.time <bound[1]])
+            if len(found_values) > 1: #or (len(list(set(found_values)))) > 1:
                 print("More than 1 value found for flag: %s" % flag)
                 # Take last value
                 last_found_val = [e.value for e in sorted(df.get_events(flag), key=lambda x: x.time)][-1]
@@ -533,12 +552,6 @@ def parse_trials(dfn, response_types=['Announce_AcquirePort1', 'Announce_Acquire
             else:
                 tmp_flags[flag] = found_values
             #    tmp_flags.pop(flag)
-        
-#         # Add current flag values to flags list:
-#         flag_list.append(tmp_flags)
-        
-#         # Add boundary time to flag info:
-#         tmp_flags.update({'run_bounds': bound})
         
         # Check for valid response types and get all response events:
         response_types = [r for r in response_types if r in codec.values()]
@@ -631,18 +644,25 @@ def parse_trials(dfn, response_types=['Announce_AcquirePort1', 'Announce_Acquire
             t['no_feedback'] = all([np.min(lims) < t[k] < np.max(lims) for k, lims in no_fb.items()])
 
     # Combine all flag states:
-    for fi, flag_dict in enumerate(flag_list):
-        if fi == 0:
-            flags = copy.copy(flag_dict)
-        else:
-            for flag_name, flag_value in flag_dict.items():
-                print(flag_name, flag_value)
-                existing_value = flags[flag_name] #.value()
-                if flag_value == existing_value:
-                    continue
-                if not isinstance(flags[flag_name], list):
-                    flags[flag_name] = [flags[flag_name]]
-                flags[flag_name].append(flag_value)
+    # Combine flag values across data files:
+    if len(flag_list) > 0:
+        flags = {
+            k: [d.get(k) for d in flag_list]
+            for k in set().union(*flag_list)
+        }
+        
+#     for fi, flag_dict in enumerate(flag_list):
+#         if fi == 0:
+#             flags = copy.copy(flag_dict)
+#         else:
+#             for flag_name, flag_value in flag_dict.items():
+#                 print(flag_name, flag_value)
+#                 existing_value = flags[flag_name] #.value()
+#                 if flag_value == existing_value:
+#                     continue
+#                 if not isinstance(flags[flag_name], list):
+#                     flags[flag_name] = [flags[flag_name]]
+#                 flags[flag_name].append(flag_value)
             
     return trials, flags, df
 
