@@ -179,11 +179,13 @@ def get_animal_df(animalid, paradigm, metadata, create_new=False, rootdir='/n/co
 
     if reload_df:
         print("... making dataframe for %s" % animalid)
-        df, new_sessions, no_trials = sessiondata_to_df(animalid, paradigm, metadata, rootdir=rootdir)
+        A, new_sessions = util.format_animal_data(animalid, paradigm, metadata, rootdir=rootdir)
+        df = util.animal_data_to_dataframe(A)
+        #df, new_sessions, no_trials = sessiondata_to_df(animalid, paradigm, metadata, rootdir=rootdir)
         with open(d_outfile, 'wb') as f:
             pkl.dump(df, f, protocol=pkl.HIGHEST_PROTOCOL)
 
-    return df, new_sessions, no_trials
+    return df, new_sessions
 
 
 def sessiondata_to_df(animalid, paradigm, metadata, rootdir='/n/coxfs01/behavior-data',
