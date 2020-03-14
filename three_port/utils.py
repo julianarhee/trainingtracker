@@ -94,12 +94,16 @@ class Session():
                 flags = dict((fkey, []) for fkey in tmp_flags[0].keys())
                 for tmp_flag in tmp_flags:
                     for flag_key, flag_value in tmp_flag.items():
+                        print(flag_key, flag_value)
                         if flag_key not in flags.keys():
                             flags[flag_key] = []
                         if not isinstance(flags[flag_key], list):
                             flags[flag_key] = [flags[flag_key]]
-                        if flag_value not in flags[flag_key]:
+                        if hasattr(flag_value, "__len__"):
                             flags[flag_key].append(flag_value)
+                        else:
+                            if flag_value not in flags[flag_key]:
+                                flags[flag_key].append(flag_value)
         else:
             # Open data file:
             dfn = self.source[0]
