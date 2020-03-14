@@ -772,7 +772,7 @@ def format_animal_data(animalid, paradigm, metadata, rootdir='/n/coxfs01/behavio
                            'FlagShowOnlyTrainedAxes']
 
     #### Get animal data (all sessions)
-    A, new_sessions = processd.load_animal_data(animalid, paradigm, metadata, rootdir=rootdir)
+    A, new_sessions = load_animal_data(animalid, paradigm, metadata, rootdir=rootdir)
 
     #### Clean up empty sessions and reformat flag states
     exclude_ = [k for k, v in A.sessions.items() if v is None]
@@ -852,3 +852,70 @@ def format_animal_data(animalid, paradigm, metadata, rootdir='/n/coxfs01/behavio
                     sessionobj.trials[ti].update({flag_name: curr_flagval})
                 
     return A, new_sessions
+
+
+
+
+def get_metadata(paradigm, rootdir='/n/coxfs01/behavior-data', create_meta=False):
+    meta_datafile = os.path.join(rootdir, paradigm, 'metadata.pkl')
+
+    reload_meta = False
+    if os.path.exists(meta_datafile):
+        print("Loading existing metadata...")
+        with open(meta_datafile, 'rb') as f:
+            metadata = pkl.load(f)
+    else:
+        reload_meta = True
+
+    if create_meta or reload_meta:
+        print("Creating new metadata...")
+        ### All raw datafiles
+        raw_fns = glob.glob(os.path.join(rootdir, paradigm, 'cohort_data', 'A*', 'raw', '*.mwk'))
+
+        #### Get all animals and sessions
+        metadata = pd.concat([pd.DataFrame({'animalid': parse_datafile_name(fn)[0],
+                                          'session': int(parse_datafile_name(fn)[1]),
+                                          'datasource': fn, 
+                                          'cohort': parse_datafile_name(fn)[0][0:2]}, index=[i]) \
+                                           for i, fn in enumerate(raw_fns)], axis=0)
+
+        with open(meta_datafile, 'wb') as f:
+            pkl.dump(metadata, f, protocol=pkl.HIGHEST_PROTOCOL)
+            
+    return metadata
+
+def load_animal_data(animalid, paradigm, metadata, rootdir='/n/coxfs01/behavior-data'):
+
+    # --- Create or load animal datafile:
+#     cohort = str(re.findall('(\D+)', aimalid)[0])
+#     curr_processed_dir = os.path.join(root, paradigm, 'cohort_data', cohort, 'processed')
+#     animal_datafile = os.path.join(curr_processed_dir, 'data', '%s.pkl' % animalid)
+#     print("outfile: %s" % animal_datafile)
+
+    # --- Check if processed file exists -- load or create new.
+    A = Animal(animalid=animalid, experiment=paradigm, rootdir=rootdir)
+    create_new = False
+    reload_data = False
+    if os.path.exists(A.path):
+        try:
+            with open(A.path, 'rb') as f:
+                A = pkl.load(f)   
+        except EOFError:
+            create_new = True
+        except ImportError:
+            reload_data = True
+            create_new = False
+    print(create_new, reload_data)
+
+    print("outfile: %s" % A.path)
+    
+    # --- Process new datafiles / sessions:
+    all_sessions = metadata[metadata.animalid==animalid]['session'].unique() #.values
+    old_sessions = [int(skey) for skey, sobject in A.sessions.items() if sobject is not None]
+    none_sessions = [int(skey) for skey, sobject in A.sessions.items() if sobject is None]
+    print("[%s]: Loaded %i processed sessions (+%i are None)." % (animalid, len(old_sessions), len(none_sessions)))
+    new_sessions = [s for s in all_sessions if s not in old_sessions and s not in none_sessions]
+    print("[%s]: Found %i out of %i sessions to process." % (A.animalid, len(new_sessions), len(all_sessions)))
+    
+    return A, new_sessions
+

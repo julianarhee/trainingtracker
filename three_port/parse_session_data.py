@@ -49,6 +49,12 @@ def extract_options(options):
             help='flag to reprocess sessions anew')
     parser.add_option('--meta', action='store_true', dest='create_meta', default=False, 
             help='flag to recreate metadata (if adding new datafiles)')
+ 
+    parser.add_option('--trials', action='store_true', dest='process_trials', default=false, 
+            help='flag to do trial-parsing step for each session (if true, also makes dataframes)')
+
+    parser.add_option('--dfs', action='store_true', dest='make_dataframe', default=false, 
+            help='flag to do only create dataframe from processed session data')
 
     (options, args) = parser.parse_args(options)
 
@@ -73,9 +79,10 @@ def main(options):
     print("***running on %i processes" % n_processes)
  
     create_new = opts.create_new
-    create_meta = opts.create_meta
- 
+    create_meta = opts.create_meta 
     plot_each_session = opts.plot_each_session
+    process_trials = opts.process_trials
+    make_dataframe = opts.make_dataframe
 
     # Set all output dirs
     cohort_dirs = [os.path.split(p)[0] for p in glob.glob(os.path.join(rootdir, paradigm, 'cohort_data', 'A*', 'raw'))]
@@ -90,50 +97,44 @@ def main(options):
         if not os.path.exists(output_datadir): os.makedirs(output_datadir)
             
     #### Load metadata
-    metadata = processd.get_metadata(paradigm, create_meta=create_meta)
+    metadata = util.get_metadata(paradigm, create_meta=create_meta)
 
-    A = None
-    if process_cohort:
-        print("-- processing cohort: %s" % cohort)
-        #### Process current animal
-        for animalid, session_meta in metadata[metadata['cohort']==cohort].groupby(['animalid']):
+    if parse_trials:
+        make_dataframe = False # already doing this by default
+        A = None
+        if process_cohort:
+            print("-- processing cohort: %s" % cohort)
+            #### Process current animal
+            for animalid, session_meta in metadata[metadata['cohort']==cohort].groupby(['animalid']):
+                print('[%s] - starting processing...' % animalid)
+                A = processd.process_sessions_for_animal(animalid, session_meta, paradigm=paradigm, n_processes=n_processes,
+                                              create_new=create_new, plot_each_session=plot_each_session)
+                print("[%s] - done processing! -" % animalid)
+
+                print("[%s] - creating dataframe" % animalid)
+                df, new_s = processd.get_animal_df(animalid, paradigm, metadata, create_new=True, rootdir=rootdir)     
+        else:
             print('[%s] - starting processing...' % animalid)
-            A = processd.process_sessions_for_animal(animalid, session_meta, paradigm=paradigm, n_processes=n_processes,
-                                          create_new=create_new, plot_each_session=plot_each_session)
+            A = processd.process_sessions_for_animal(animalid, metadata, paradigm=paradigm, n_processes=n_processes,
+                                              create_new=create_new, plot_each_session=plot_each_session)
             print("[%s] - done processing! -" % animalid)
-
+            
             print("[%s] - creating dataframe" % animalid)
-            outdir = os.path.join(rootdir, paradigm, 'processed', 'data')
-            if not os.path.exists(outdir):
-                os.makedirs(outdir)
-            d_outfile = os.path.join(outdir, 'df_%s.pkl' % animalid)
-            A, new_sessions = util.format_animal_data(animalid, paradigm, metadata, rootdir=rootdir)
-            df = util.animal_data_to_dataframe(A)
-            with open(d_outfile, 'wb') as f:
-                pkl.dump(df, f, protocol=pkl.HIGHEST_PROTOCOL)
-            #df, new_s, no_trials = processd.get_animal_df(animalid, paradigm, metadata, create_new=True, rootdir=rootdir)    
+            df, new_s = processd.get_animal_df(animalid, paradigm, metadata, create_new=True, rootdir=rootdir)    
+      
+    if make_dataframe:
+        if process_cohort:
+            #### Process current animal
+            for animalid, session_meta in metadata[metadata['cohort']==cohort].groupby(['animalid']):
+                print("[%s] - creating dataframe" % animalid)
+                df, new_s = processd.get_animal_df(animalid, paradigm, session_meta, create_new=True, rootdir=rootdir)     
+        else:            
+            print("[%s] - creating dataframe" % animalid)
+            df, new_s = processd.get_animal_df(animalid, paradigm, metadata, create_new=True, rootdir=rootdir)    
  
-    else:
-        print('[%s] - starting processing...' % animalid)
-        A = processd.process_sessions_for_animal(animalid, metadata, paradigm=paradigm, n_processes=n_processes,
-                                          create_new=create_new, plot_each_session=plot_each_session)
-        print("[%s] - done processing! -" % animalid)
-        
-        print("[%s] - creating dataframe" % animalid)
-        outdir = os.path.join(rootdir, paradigm, 'processed', 'data')
-        if not os.path.exists(outdir):
-            os.makedirs(outdir)
-        d_outfile = os.path.join(outdir, 'df_%s.pkl' % animalid)
-        A, new_sessions = util.format_animal_data(animalid, paradigm, metadata, rootdir=rootdir)
-        df = util.animal_data_to_dataframe(A)
-        with open(d_outfile, 'wb') as f:
-            pkl.dump(df, f, protocol=pkl.HIGHEST_PROTOCOL)
 
-
-        #df, new_s, no_trials = processd.get_animal_df(animalid, paradigm, metadata, create_new=True, rootdir=rootdir)    
-   
     print("~~~ done! ~~~")
- 
+     
     return A
 
 if __name__ == '__main__':
