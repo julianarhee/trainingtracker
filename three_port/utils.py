@@ -29,6 +29,109 @@ def natural_keys(text):
     return [ atoi(c) for c in re.split('(\d+)', text) ]
 
 
+def get_screen_info(df, run_bounds=None):
+    
+    if run_bounds is None:
+        run_bounds = get_run_time(df)
+        assert len(run_bounds) > 0, "ABORT. No run times found: %s" % df.filename
+        
+    if len(run_bounds)==1:
+        run_mode_times = run_bounds[0]
+    else:
+        run_mode_times = (run_bounds[0][0], run_bounds[-1][1])
+
+    screenkeys = ['distance', 'width', 'height', 'units', 'refresh_rate_hz']
+    
+    mainscreen_evs = sorted([e for e in df.get_events('#mainScreenInfo') \
+                   if run_mode_times[0] <= e.time <= run_mode_times[1]], key=lambda x: x.time)
+    if len(mainscreen_evs) == 0:
+        # Find last event
+        mainscreen_evs = sorted(df.get_events('#mainScreenInfo'), key=lambda x: x.time)
+
+    mainscreen_ev = mainscreen_evs[-1]
+    screen = dict((k, mainscreen_ev.value[k]) for k in screenkeys)
+
+
+    return screen
+
+
+def parse_datafile_name(dfn):
+    '''
+    Generally expects:
+        ANIMALID_YYYYMMDD_stuff.mwk
+        ...
+    '''
+    fn = os.path.splitext(os.path.split(dfn)[-1])[0]
+    fparts = fn.split('_')
+
+    assert len(fparts) >= 2, "*Warning* Unknown naming fmt: %s" % str(fparts)
+    animalid = fparts[0]
+    datestr = re.search('(\d+)', fparts[1]).group(0)
+
+    # Make sure no exra letters are in the datestr (for parta, b, etc.)
+    if not datestr.isdigit():
+        datestr = re.split(r'\D', datestr)[0] # cut off any letter suffix
+    if len(datestr) == 6:
+        session = '20%s' % datestr 
+    elif len(datestr) == 8:
+        session = datestr 
+
+    return animalid, session
+
+
+def get_run_time(df):
+    
+    '''
+    When was the session running?
+    '''
+    
+    no_stop_mode = False
+    state_modes = df.get_events('#state_system_mode')
+    state_modes = sorted(state_modes, key=lambda x: x.time)
+    if state_modes[-1].value == 2:
+        no_stop_mode = True
+
+    run_bounds = None
+
+    while True:
+        try:
+            running = next(d for d in state_modes if d.value==2)
+            start_time = running.time
+            strt = state_modes.index(running)
+        except StopIteration:
+            #break
+            return run_bounds
+        print("-- finding stop")
+        stp = strt
+        if no_stop_mode:
+            end_time = df.get_maximum_time()
+            if run_bounds is None:
+                run_bounds = []
+            run_bounds.append((start_time, end_time))
+            break
+        else:
+            try:
+                stopping = next(d for d in state_modes[strt:] if d.value != 2) 
+                end_time = stopping.time
+                stp = state_modes.index(stopping)
+            except StopIteration:
+                end_time = df.get_maximum_time()
+
+            if run_bounds is None:
+                run_bounds = []
+            run_bounds.append((start_time, end_time))
+
+            # Check if there are additional run chunks:
+            remaining_state_evs = state_modes[stp:]
+            additional_starts = [s for s in remaining_state_evs if s.value == 2]
+            if len(additional_starts) > 0:
+                state_modes = remaining_state_evs
+            else:
+                break
+
+    return run_bounds
+
+
 class Animal():
     def __init__(self, animalid='RAT', experiment='EXPERIMENT', rootdir='/n/coxfs01/behavior-data'): #, dst_dir='/tmp'):
         self.animalid = animalid
@@ -59,6 +162,7 @@ class Session():
         self.experiment_path = None
         self.protocol = None
         self.server = None # session_meta['server']
+        self.screen = None
         self.trials = None
         self.flags = None
         self.stimuli = None
@@ -105,24 +209,6 @@ class Session():
                     if len(u_vals)==1:
                         u_vals=u_vals[0]
                     flags[k] = u_vals 
-            
-
-#             if len(tmp_flags) > 0:
-#                 flags = dict((fkey, []) for fkey in tmp_flags[0].keys())
-#                 for tmp_flag in tmp_flags:
-#                     for flag_key, flag_value in tmp_flag.items():
-#                         if flag_key not in flags.keys():
-#                             flags[flag_key] = []
-#                         if not hasattr(flags[flag_key], '__len__'):
-#                             flags[flag_key] = [flags[flag_key]]
-#                         if hasattr(flag_value, '__len__'):
-#                             flags[flag_key].append(flag_value)
-#                         else:
-#                             print(flag_key, flag_value)
-#                             print(hasattr(flag_value, '__len__'))
-#                             print(flags[flag_key])
-#                             if all(flag_value not in flags[flag_key]):
-#                                 flags[flag_key].append(flag_value)
         else:
             # Open data file:
             dfn = self.source[0]
@@ -137,6 +223,11 @@ class Session():
         server_name = df.get_events('#serverName')[-1].value
         self.server =  {'address': server_address, 'name': server_name}
         
+        #### Get screen info
+        screen_info = get_screen_info(df, run_bounds=self.flags['run_bounds'])
+        self.screen = screen_info
+        
+        
         #### Save experiment and protocol info:
         # [(payload_type, event_type)]:  [(4013, 1002), (2001, 1001), (4007, 1002)] # 1002:  Datafile creation
         experiment_load = 4013 #:  Looks like which experiment file(s) loaded (.mwk)
@@ -149,6 +240,9 @@ class Session():
         #assert len(exp_path) == 1, "*ERROR* More than 1 experiment loaded..."
         #exp_path = exp_path[0].split('/Experiment Cache/')[1]
         self.experiment_path = exp_path
+        
+        #re.search(r'/Experiment Cache/(.*?)/tmp', t['filename']).group(1)
+        self.experiment = os.path.split(exp_path[0])[-1]
 
         #### Get protocol protocol name:
         prot_evs = [v for v in sys_evs if v.value['payload_type']==protocol_load]
@@ -271,84 +365,6 @@ class Session():
             pl.savefig(os.path.join(save_dir, '%s_%s_morphs.png' % (self.animalid, self.session)))
             pl.close()
 
-
-def parse_datafile_name(dfn):
-    '''
-    Generally expects:
-        ANIMALID_YYYYMMDD_stuff.mwk
-        ...
-    '''
-    fn = os.path.splitext(os.path.split(dfn)[-1])[0]
-    fparts = fn.split('_')
-
-    assert len(fparts) >= 2, "*Warning* Unknown naming fmt: %s" % str(fparts)
-    animalid = fparts[0]
-    datestr = re.search('(\d+)', fparts[1]).group(0)
-
-    # Make sure no exra letters are in the datestr (for parta, b, etc.)
-    if not datestr.isdigit():
-        datestr = re.split(r'\D', datestr)[0] # cut off any letter suffix
-    if len(datestr) == 6:
-        session = '20%s' % datestr 
-    elif len(datestr) == 8:
-        session = datestr 
-
-    return animalid, session
-
-
-def get_run_time(df):
-    
-    '''
-    When was the session running?
-    '''
-    
-    no_stop_mode = False
-    state_modes = df.get_events('#state_system_mode')
-    state_modes = sorted(state_modes, key=lambda x: x.time)
-    if state_modes[-1].value == 2:
-        no_stop_mode = True
-
-    run_bounds = None
-
-    while True:
-        try:
-            running = next(d for d in state_modes if d.value==2)
-            start_time = running.time
-            strt = state_modes.index(running)
-        except StopIteration:
-            #break
-            return run_bounds
-        print("-- finding stop")
-        if no_stop_mode:
-            end_time = df.get_maximum_time()
-            stp = strt
-            if run_bounds is None:
-                run_bounds = []
-            run_bounds.append((start_time, end_time))
-            break
-        else:
-            stp = strt
-            try:
-                stopping = next(d for d in state_modes[strt:] if d.value != 2) 
-                end_time = stopping.time
-                stp = state_modes.index(stopping)
-            except StopIteration:
-                end_time = df.get_maximum_time()
-                #stp = 0
-
-            if run_bounds is None:
-                run_bounds = []
-            run_bounds.append((start_time, end_time))
-
-            # Check if there are additional run chunks:
-            remaining_state_evs = state_modes[stp:]
-            additional_starts = [s for s in remaining_state_evs if s.value == 2]
-            if len(additional_starts) > 0:
-                state_modes = remaining_state_evs
-            else:
-                break
-
-    return run_bounds
 
 
 def process_sessions_mp(new_sessions, session_meta, dst_dir='/tmp',
@@ -666,10 +682,56 @@ def parse_trials(dfn, response_types=['Announce_AcquirePort1', 'Announce_Acquire
             
     return trials, flags, df
 
+
+# def to_stims(events, as_dicts=True, blacklist=None):
+#     if blacklist is None:
+#         blacklist = blacklisttests
+#     if not isinstance(blacklist, (tuple, list)):
+#         blacklist = (blacklist, )
+#     stims = []
+#     onscreen = []
+#     for e in sorted(events, key=lambda e: e.time):
+#         if e.value is None:
+#             logging.warning("Encountered event with value == None")
+#             if onscreen != {}:
+#                 logging.error("Event.value == None with items on screen")
+#             continue
+#         current = []
+#         if hasattr(e.value, '__getitem__'):
+#             stimulus = None
+#             pixelclock = None
+#             stim2 = None
+#             for stim in e.value:
+#                 if not isinstance(stim, dict) or \
+#                         any([t(stim) for t in blacklist]):
+#                     continue
+#                 if ('name' in stim.keys()) and (stim['name'] == 'pixel clock'):
+#                     pixelclock = stim
+#                 else:
+#                     if stimulus is not None:
+#                         logging.warning(
+#                             "Two stimuli onscreen: %s, %s"
+#                             % (stimulus, stim))
+#                         stim2 = stimulus.copy()
+#                         stimulus = stim
+#                     else:
+#                         stim2 = None
+#                         stimulus = stim
+#             if stimulus is not None:
+#                 current.append(pymworks.events.display.Stimulus(e.time, stim2, stimulus, pixelclock))
+#         newstims, onscreen = pymworks.events.display.find_stims(onscreen, current, e.time)
+#         stims += newstims
+#     if as_dicts:
+#         return [s.to_dict() for s in stims]
+#     return stims
+
+
 def to_trials(stim_display_events, outcome_events, outcome_key='outcome',
               remove_unknown=True,
               duration_multiplier=2, stim_blacklists=None):
     """
+    from pymworks module
+    
     If remove_unknown, any trials where a corresponding outcome_event cannot
     be found will be removed.
     
@@ -686,7 +748,6 @@ def to_trials(stim_display_events, outcome_events, outcome_key='outcome',
         if  1, slave events occur after master events
         if  0, slave and master events occur simultaneously
 
-
     """
     if (len(outcome_events) == 0) or (len(stim_display_events) == 0):
         return []
@@ -694,6 +755,8 @@ def to_trials(stim_display_events, outcome_events, outcome_key='outcome',
 
     trials = pymworks.events.display.to_stims(stim_display_events, as_dicts=True,
                       blacklist=stim_blacklists)
+#     trials = to_stims(stim_display_events, as_dicts=True,
+#                       blacklist=stim_blacklists)
 
     if (len(trials) == 0):
         return []
@@ -808,7 +871,7 @@ def format_animal_data(animalid, paradigm, metadata, rootdir='/n/coxfs01/behavio
                     diff_flag_lookup[flag_name] = dict()
 
                 # Make sure these correspond to different run bounds
-                assert len(flag_value) == len(sessionobj.flags['run_bounds']), "%s: %s -- only %i run bounds found." % (flag_name, str(flag_value), len(sessionobj.flags['run_bounds']))
+                assert len(flag_value) == len(sessionobj.flags['run_bounds']), "[%s] %s: %s -- only %i run bounds found." % (session, flag_name, str(flag_value), len(sessionobj.flags['run_bounds']))
                 if session not in multi_phase:
                     multi_phase.append(session)
 
