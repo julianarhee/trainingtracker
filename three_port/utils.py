@@ -35,11 +35,13 @@ def get_screen_info(df, run_bounds=None):
         run_bounds = get_run_time(df)
         assert len(run_bounds) > 0, "ABORT. No run times found: %s" % df.filename
         
-    if len(run_bounds)==1:
+    if isinstance(run_bounds, list) and len(run_bounds)==1:
         run_mode_times = run_bounds[0]
-    else:
+    elif isinstance(run_bounds, list) and len(run_bounds) > 1:
         run_mode_times = (run_bounds[0][0], run_bounds[-1][1])
-
+    elif isinstance(run_bounds, tuple):
+        run_mode_times = run_bounds
+        
     screenkeys = ['distance', 'width', 'height', 'units', 'refresh_rate_hz']
     
     mainscreen_evs = sorted([e for e in df.get_events('#mainScreenInfo') \
