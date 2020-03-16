@@ -50,7 +50,7 @@ def extract_options(options):
     parser.add_option('--meta', action='store_true', dest='create_meta', default=False, 
             help='flag to recreate metadata (if adding new datafiles)')
  
-    parser.add_option('--trials', action='store_true', dest='parse_trials', default=False, 
+    parser.add_option('--process', action='store_true', dest='process_raw', default=False, 
             help='flag to do trial-parsing step for each session (if true, also makes dataframes)')
 
     parser.add_option('--dfs', action='store_true', dest='make_dataframe', default=False, 
@@ -81,7 +81,7 @@ def main(options):
     create_new = opts.create_new
     create_meta = opts.create_meta 
     plot_each_session = opts.plot_each_session
-    parse_trials = opts.parse_trials
+    process_raw = opts.process_raw
     make_dataframe = opts.make_dataframe
 
     # Set all output dirs
@@ -99,7 +99,7 @@ def main(options):
     #### Load metadata
     metadata = util.get_metadata(paradigm, create_meta=create_meta)
 
-    if parse_trials:
+    if process_raw: #parse_trials:
         make_dataframe = False # already doing this by default
         A = None
         if process_cohort:
@@ -107,7 +107,7 @@ def main(options):
             #### Process current animal
             for animalid, session_meta in metadata[metadata['cohort']==cohort].groupby(['animalid']):
                 print('[%s] - starting processing...' % animalid)
-                A = processd.process_sessions_for_animal(animalid, session_meta, paradigm=paradigm, n_processes=n_processes,
+                A = processd.get_sessions_for_animal(animalid, session_meta, paradigm=paradigm, n_processes=n_processes,
                                               create_new=create_new, plot_each_session=plot_each_session)
                 print("[%s] - done processing! -" % animalid)
 
@@ -115,7 +115,7 @@ def main(options):
                 df, new_s = processd.get_animal_df(animalid, paradigm, metadata, create_new=True, rootdir=rootdir)     
         else:
             print('[%s] - starting processing...' % animalid)
-            A = processd.process_sessions_for_animal(animalid, metadata, paradigm=paradigm, n_processes=n_processes,
+            A = processd.get_sessions_for_animal(animalid, metadata, paradigm=paradigm, n_processes=n_processes,
                                               create_new=create_new, plot_each_session=plot_each_session)
             print("[%s] - done processing! -" % animalid)
             

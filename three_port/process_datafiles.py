@@ -33,7 +33,7 @@ def natural_keys(text):
     return [ atoi(c) for c in re.split('(\d+)', text) ]
 
 
-def process_sessions_for_animal(animalid, metadata, n_processes=1, plot_each_session=False,
+def get_sessions_for_animal(animalid, metadata, n_processes=1, plot_each_session=False,
                                paradigm='threeport', create_new=False,
                                response_types=['Announce_AcquirePort1', 'Announce_AcquirePort3', 'ignore'],
                                outcome_types=['success', 'ignore', 'failure'],
@@ -59,7 +59,7 @@ def process_sessions_for_animal(animalid, metadata, n_processes=1, plot_each_ses
     if create_new:
         print("!!! (Re)processing all sessions.")
         new_sessions = session_meta['session'].unique()
-    processed_sessions = util.process_sessions_mp(new_sessions, session_meta,
+    processed_sessions = util.get_sessions_mp(new_sessions, session_meta,
                                              n_processes=n_processes, plot_each_session=plot_each_session,
                                              ignore_flags=ignore_flags,
                                              response_types=response_types,
@@ -80,7 +80,7 @@ def process_sessions_for_animal(animalid, metadata, n_processes=1, plot_each_ses
         print("Reprocessing %i old sessions..." % len(processed_sessions))
         for session in old_sessions:
             curr_sessionmeta = session_meta[session_meta.session==session] #session_info[datestr]
-            S = pd.process_session(curr_sessionmeta)
+            S = util.get_session_data(curr_sessionmeta)
             A.sessions[session] = S
         with open(A.path, 'wb') as f:
             pkl.dump(A, f, protocol=pkl.HIGHEST_PROTOCOL)
@@ -101,9 +101,7 @@ def get_animal_df(animalid, paradigm, metadata, create_new=False, rootdir='/n/co
     outdir = os.path.join(rootdir, paradigm, 'processed', 'data')
     if not os.path.exists(outdir):
         os.makedirs(outdir)
-    print(outdir)
     d_outfile = os.path.join(outdir, 'df_%s.pkl' % animalid)
-    print(d_outfile)
     
     reload_df = False
     if os.path.exists(d_outfile) and create_new is False:
@@ -118,8 +116,11 @@ def get_animal_df(animalid, paradigm, metadata, create_new=False, rootdir='/n/co
         A, new_sessions = util.format_animal_data(animalid, paradigm, metadata, rootdir=rootdir)
         df = util.animal_data_to_dataframe(A)
         #df, new_sessions, no_trials = sessiondata_to_df(animalid, paradigm, metadata, rootdir=rootdir)
-        with open(d_outfile, 'wb') as f:
-            pkl.dump(df, f, protocol=pkl.HIGHEST_PROTOCOL)
+        if df is None:
+            return None, None
+        else:
+            with open(d_outfile, 'wb') as f:
+                pkl.dump(df, f, protocol=pkl.HIGHEST_PROTOCOL)
 
     return df, new_sessions
 
