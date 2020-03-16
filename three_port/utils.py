@@ -556,16 +556,19 @@ def parse_mw_file(dfn, dst_dir=None, create_new=False,
             tmp_flags = dict((flag, None) for flag in flag_names)
             for flag in flag_names:
                 if flag == 'FlagNoFeedbackInCurrentTrial': continue
-                found_values = np.unique([e.value for e in df.get_events(flag) if bound[0] < e.time <bound[1]])
+                found_values = np.unique([e.value for e in df.get_events(flag) if bound[0] <= e.time <= bound[1]])
                 if len(found_values) > 1: #or (len(list(set(found_values)))) > 1:
                     print("More than 1 value found for flag: %s" % flag)
                     # Take last value
-                    last_found_val = [e.value for e in sorted(df.get_events(flag), key=lambda x: x.time)][-1]
+                    last_found_val = int([e.value for e in sorted(df.get_events(flag), key=lambda x: x.time)][-1])
                     tmp_flags[flag] = int(last_found_val)
                 elif (len(found_values) == 1): # or (len(list(set(found_values)))) == 1:
                     tmp_flags[flag] = int(found_values[0])
-                else:
-                    tmp_flags[flag] = found_values
+                else: # NO found values:
+                    # Find last event
+                    fevs = sorted(df.get_events(flag), key=lambda x: x.time)
+                    last_found_val = int(fevs[-1].value)
+                    tmp_flags[flag] = last_found_val
 
             # Check for valid response types and get all response events:
             response_types = [r for r in response_types if r in codec.values()]
