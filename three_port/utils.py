@@ -628,9 +628,14 @@ def parse_mw_file(dfn, dst_dir=None, create_new=False,
                         print("More than 1 value for %s: %s" % (flag, str(found_values)))
                         if flag == 'FlagAddFreeRewardToEarnedReward':   
                             # This is a trial-to-trial changing flag
-                            found_values = 1 if any(found_values) else 0
+                            found_values = 1 if any(found_values==1) else 0
 
                         # Save all values...
+                        else:
+                            if len(found_values) > 0:
+                                sorted_evs = sorted(tmp_flag_evs, key=lambda x: x.time)
+                                found_values = sorted_evs[-1].value
+
                         tmp_flags[flag] = found_values
                     elif (len(found_values) == 1): 
                         # Save the single value
@@ -640,8 +645,20 @@ def parse_mw_file(dfn, dst_dir=None, create_new=False,
                         print("*warning* - %s: no found values (taking last...)" % flag)
                         fevs = sorted(df.get_events(flag), key=lambda x: x.time)
                         last_found_val = int(fevs[-1].value)
-                        tmp_flags[flag] = last_found_val
+                        tmp_flags[flag] = None #last_found_val
 
+                # CHECK TRAINING.----------------------
+#                tested_sz = np.unique([t['size'] for t in tmp_trials])
+#                if len(tested_sz) > 1 and tmp_flags['FlagStaircaseSize']!=1:
+#                    tmp_flags['FlagStairCaseSize'] = 1
+#                tested_rot = np.unique([t['depth_rotation'] for t in tmp_trials])
+#                if len(tested_rot) > 1:
+#                    if any(tested_rot<0) and not any(tmp_flags['FlagStaircaseDeptRotLeft']):
+#                        tmp_flags['FlagStaircaseDeptRotLeft'] = 1
+#                    if any(tested_rot>0) and not any(tmp_flags['FlagStaircaseDeptRotRight']):
+#                        tmp_flags['FlagStaircaseDeptRotRight'] = 1
+                # ------------------------------------------- 
+              
                 # Add current flag values to flags list:
                 flag_list.append(tmp_flags)
                 # Add boundary time to flag info:
@@ -683,7 +700,8 @@ def parse_mw_file(dfn, dst_dir=None, create_new=False,
             else:
                 t['no_feedback'] = all([np.min(lims) < t[k] < np.max(lims) for k, lims in no_fb.items()])
 
-        # Combine all flag states:
+
+
         # Combine flag values across data files:
         if len(flag_list) > 0:
             flags = {
@@ -853,6 +871,7 @@ def trialdict_to_dataframe(session_trials, session='YYYYMMDD',
                          for param, paramvalue in trial.items() if isinstance(paramvalue, tuple)]
         for rparam in reformat_params:
             trial.update(rparam)
+        #print(trial)
         dflist.append(pd.DataFrame(trial, index=[ti]))
     if len(dflist) > 0:
         trialdf = pd.concat(dflist, axis=0)
@@ -904,7 +923,7 @@ def format_animal_data(animalid, paradigm, metadata, rootdir='/n/coxfs01/behavio
             continue
 
         for key, val in sessionobj.flags.items():
-            #print(key, val)
+            print(key, val)
             if isinstance(val, list) and len(val)==1:
                 sessionobj.flags[key] = val[0]
             elif len(np.unique(val))==1:
@@ -925,7 +944,8 @@ def format_animal_data(animalid, paradigm, metadata, rootdir='/n/coxfs01/behavio
         same_flag_lookup = {} 
         for flag_name, flag_value in curr_flag_states.items():
 
-            if hasattr(flag_value, "__len__") and len(flag_value)>1:
+            #if hasattr(flag_value, "__len__") and len(flag_value)>1:
+            if isinstance(flag_value, list) and len(flag_value) > 1:
                 if flag_name not in diff_flag_lookup.keys():
                     diff_flag_lookup[flag_name] = dict()
 
@@ -934,8 +954,10 @@ def format_animal_data(animalid, paradigm, metadata, rootdir='/n/coxfs01/behavio
                 if session not in multi_phase:
                     multi_phase.append(session)
 
+                print("RUN:", sessionobj.flags['run_bounds'])
                 # Only update trials for flag names w/ differing values in session
                 for rbounds, currval in zip(sessionobj.flags['run_bounds'], flag_value):
+                    print(rbounds)
                     tmp_trial_ixs = [ti for ti, trial in enumerate(sessionobj.trials) if rbounds[0] < trial['time'] < rbounds[1]]
                     print(session, flag_name, currval, len(tmp_trial_ixs))
                     if len(tmp_trial_ixs) > 0:
@@ -960,8 +982,8 @@ def format_animal_data(animalid, paradigm, metadata, rootdir='/n/coxfs01/behavio
         # Remove bounds if needed:
         if len(rm_these_bounds) > 0:
             print("%s, removing %i bounds" % (session, len(rm_these_bounds)))
-            real_bounds = [r for r in A.flags['run_bounds'] if r not in rm_these_bounds]
-            A.flags['run_bounds'] = real_bounds
+            real_bounds = [r for r in sessionobj.flags['run_bounds'] if r not in rm_these_bounds]
+            sessionobj.flags['run_bounds'] = real_bounds
 
     # Update sessions with trials in different phases
     for session in multi_phase:
