@@ -196,7 +196,7 @@ class Session():
         tmp_flags = []
         tmp_meta = []
         #if isinstance(self.source, list) and len(self.source) > 1:
-        for dfn in self.source:
+        for dfn in sorted(self.source, key=natural_keys):
             print('--> %s' % dfn)
             curr_trials, curr_flags, curr_meta = parse_mw_file(dfn, create_new=create_new,
                                                                response_types=response_types, 
