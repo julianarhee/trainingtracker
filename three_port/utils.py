@@ -39,9 +39,9 @@ def get_screen_info(df, run_bounds=None):
     if isinstance(run_bounds, list) and len(run_bounds)==1:
         run_mode_times = run_bounds[0]
     elif isinstance(run_bounds, list) and len(run_bounds) > 1:
-        starts = [r[0][0] for r in run_bounds]
-        ends = [r[-1][1] for r in run_bounds]
-        run_mode_times =(starts[0], ends[-1]) # run_bounds[-1][1])
+        starts = [r[0] for r in run_bounds]
+        ends = [r[1] for r in run_bounds]
+        run_mode_times =(float(starts[0]), float(ends[-1])) # run_bounds[-1][1])
     elif isinstance(run_bounds, tuple):
         run_mode_times = run_bounds
         
@@ -167,6 +167,8 @@ class Session():
         self.animalid = session_meta['animalid'].unique()[0]
         self.session = session_meta['session'].unique()[0]
         self.source = sorted(session_meta['datasource'].unique(), key=natural_keys)
+        self.suffix = dict((k, sm['suffix'].unique()[0]) for k, sm in session_meta.groupby(['datasource']))
+
         self.experiment = None
         self.experiment_path = None
         self.protocol = None
@@ -196,13 +198,17 @@ class Session():
         tmp_flags = []
         tmp_meta = []
         #if isinstance(self.source, list) and len(self.source) > 1:
-        for dfn in sorted(self.source, key=natural_keys):
-            print('--> %s' % dfn)
+        for di, dfn in enumerate(sorted(self.source, key=natural_keys)):
+            print('--> [%i] of %i: %s' % (int(di+1), len(self.source), dfn))
             curr_trials, curr_flags, curr_meta = parse_mw_file(dfn, create_new=create_new,
                                                                response_types=response_types, 
                                                                outcome_types=outcome_types,
                                                                ignore_flags=ignore_flags)
+            
             if curr_trials is not None:
+                curr_suffix = self.suffix[dfn]
+                for t in curr_trials:
+                    t.update({'suffix': curr_suffix})
                 trials.extend(curr_trials)
                 tmp_flags.append(curr_flags)
                 tmp_meta.append(curr_meta)
@@ -213,35 +219,44 @@ class Session():
         if len(tmp_meta) > 0:
             meta = {k: [d.get(k) for d in tmp_meta] for k in set().union(*tmp_meta)}
 
+        print("---")
+        #print(flags)
         # Clean up dicts
         for k, v in meta.items():
             if len(v) == 1:
                 meta[k] = v[0]
 
         for k, v in flags.items():
+            vals = [vv[0] for vv in v]
+            #print(k, vals)
             if k=='run_bounds':
+                flags[k] = vals
                 # keep separate so we know when datafile splits happen
                 continue
+
             # Combine single-values and get unique
-            if len(v)>1:
-                u_vals = np.unique([vv for vv in v])
-                if len(u_vals)==1:
-                    u_vals=u_vals[0]
+            if len(np.unique(vals))==1:
+                u_vals = np.unique(vals)
+                #if len(u_vals)==1:
+                u_vals=u_vals[0]
                 flags[k] = u_vals 
+            else:
+                flags[k] = vals
 #         else:
 #             # Open data file:
 #             dfn = self.source[0]
 #             trials, flags, df = parse_trials(dfn, response_types=response_types, 
 #                                          outcome_types=outcome_types,
 #                                          ignore_flags=ignore_flags)
-        self.trials = trials
-        self.flags = flags
+        self.trials = trials if len(trials)>0 else None
+        self.flags = flags if len(flags)>0 else None
 
-        self.server =  {'address': meta['address'], 'name': meta['server']}
-        self.screen = meta['screen'] 
-        self.experiment_path = meta['experiment_path'] 
-        self.experiment = meta['experiment'] 
-        self.protocol = meta['protocol']
+        if len(trials) > 0:
+            self.server =  {'address': meta['address'], 'name': meta['server']}
+            self.screen = meta['screen'] 
+            self.experiment_path = meta['experiment_path'] 
+            self.experiment = meta['experiment'] 
+            self.protocol = meta['protocol']
 
         return trials, flags, meta
     
@@ -458,24 +473,27 @@ def get_session_data(session_meta, dst_dir='/tmp',
 #
     #if parse_data or create_new:
     S.get_trials(response_types=['Announce_AcquirePort1', 'Announce_AcquirePort3', 'ignore'], \
-                 outcome_types = ['success', 'ignore', 'failure'])
-    S.get_summary()
-        
-        # Save tmp file:
-#        with open(tmp_processed_file, 'wb') as f:
-#            pkl.dump(S, f, protocol=pkl.HIGHEST_PROTOCOL)
-#     
-    if S.summary is None or S.summary['ntrials'] == 0:
-        print("--- no trials ---")
-        return None
-  
-    if plot_each_session:
-        print("... plotting some stats...")
-        S.plot_performance_by_transform(save_dir=dst_dir_figures)
+                 outcome_types = ['success', 'ignore', 'failure'], create_new=create_new)
 
-        if any('morph' in i for i in S.stimuli):
-            S.plot_performance_by_morph(save_dir=dst_dir_figures)
-           
+    if S.trials is not None:
+            
+        S.get_summary()
+            
+            # Save tmp file:
+    #        with open(tmp_processed_file, 'wb') as f:
+    #            pkl.dump(S, f, protocol=pkl.HIGHEST_PROTOCOL)
+    #     
+        if S.summary is None or S.summary['ntrials'] == 0:
+            print("--- no trials ---")
+            return None
+      
+        if plot_each_session:
+            print("... plotting some stats...")
+            S.plot_performance_by_transform(save_dir=dst_dir_figures)
+
+            if any('morph' in i for i in S.stimuli):
+                S.plot_performance_by_morph(save_dir=dst_dir_figures)
+               
     return S
 
 def parse_mw_file(dfn, dst_dir=None, create_new=False,
@@ -514,6 +532,7 @@ def parse_mw_file(dfn, dst_dir=None, create_new=False,
         print "***** Parsing trials *****"
         print("-- saving tmp outfile to: %s" % (dst_outfile))
         df = pymworks.open(dfn)
+        codec = df.get_codec()
 
         # Get run bounds:
         bounds = get_run_time(df)
@@ -546,29 +565,6 @@ def parse_mw_file(dfn, dst_dir=None, create_new=False,
             # Get display events:
             tmp_devs = df.get_events('#stimDisplayUpdate')                     
             tmp_devs = [i for i in tmp_devs if bound[0] <= i['time']<= bound[1]] 
-
-            # Separate behavior-training flag states from current trial states
-            codec = df.get_codec()
-            all_flags = [f for f in codec.values() if 'Flag' in f or 'flag' in f]
-            ignore_flags_with_name = ['Curr', 'current', 'Current', 'curr']
-            ignore_flags = [f for f in all_flags if any([fstr in f for fstr in ignore_flags_with_name])]
-            flag_names = [f for f in all_flags if f not in ignore_flags]
-            tmp_flags = dict((flag, None) for flag in flag_names)
-            for flag in flag_names:
-                if flag == 'FlagNoFeedbackInCurrentTrial': continue
-                found_values = np.unique([e.value for e in df.get_events(flag) if bound[0] <= e.time <= bound[1]])
-                if len(found_values) > 1: #or (len(list(set(found_values)))) > 1:
-                    print("More than 1 value found for flag: %s" % flag)
-                    # Take last value
-                    last_found_val = int([e.value for e in sorted(df.get_events(flag), key=lambda x: x.time)][-1])
-                    tmp_flags[flag] = int(last_found_val)
-                elif (len(found_values) == 1): # or (len(list(set(found_values)))) == 1:
-                    tmp_flags[flag] = int(found_values[0])
-                else: # NO found values:
-                    # Find last event
-                    fevs = sorted(df.get_events(flag), key=lambda x: x.time)
-                    last_found_val = int(fevs[-1].value)
-                    tmp_flags[flag] = last_found_val
 
             # Check for valid response types and get all response events:
             response_types = [r for r in response_types if r in codec.values()]
@@ -610,13 +606,49 @@ def parse_mw_file(dfn, dst_dir=None, create_new=False,
             trials.extend(tmp_trials)
 
             if len(tmp_trials) > 0:
+                offset = 30000000 # 50ms in time
+                start_t = bound[0] #+ offset #tmp_trials[0]['time']
+                end_t = bound[1] #tmp_trials[-1]['time']
+
+                # Separate behavior-training flag states from current trial states
+                all_flags = [f for f in codec.values() if 'Flag' in f or 'flag' in f]
+                ignore_flags_with_name = ['Curr', 'current', 'Current', 'curr', 'ShowStimRight', 'ShowStimLeft', 'ForceCueStim']
+                ignore_flags = [f for f in all_flags if any([fstr in f for fstr in ignore_flags_with_name])]
+                flag_names = [f for f in all_flags if f not in ignore_flags]
+                tmp_flags = dict((flag, None) for flag in flag_names)
+                for flag in flag_names:
+                    if flag == 'FlagNoFeedbackInCurrentTrial': 
+                        continue
+                    tmp_flag_evs = [e for e in df.get_events(flag) if (start_t+offset) <= e.time <= end_t]
+                    if len(tmp_flag_evs)==0:
+                        tmp_flag_evs = [e for e in df.get_events(flag) if start_t <= e.time <= end_t]
+
+                    found_values = np.unique([e.value for e in tmp_flag_evs])
+                    if len(found_values) > 1: 
+                        print("More than 1 value for %s: %s" % (flag, str(found_values)))
+                        if flag == 'FlagAddFreeRewardToEarnedReward':   
+                            # This is a trial-to-trial changing flag
+                            found_values = 1 if any(found_values) else 0
+
+                        # Save all values...
+                        tmp_flags[flag] = found_values
+                    elif (len(found_values) == 1): 
+                        # Save the single value
+                        tmp_flags[flag] = int(found_values[0])
+                    else: # NO found values:
+                        # Find last event
+                        print("*warning* - %s: no found values (taking last...)" % flag)
+                        fevs = sorted(df.get_events(flag), key=lambda x: x.time)
+                        last_found_val = int(fevs[-1].value)
+                        tmp_flags[flag] = last_found_val
+
                 # Add current flag values to flags list:
                 flag_list.append(tmp_flags)
                 # Add boundary time to flag info:
                 tmp_flags.update({'run_bounds': bound})
 
         if len(trials) == 0:
-            return trials, flags, df
+            return trials, flags, metainfo
 
         for t in trials:
             stim_aspect = [v.value for v in df.get_events('StimAspectRatio')][-1]
@@ -625,6 +657,8 @@ def parse_mw_file(dfn, dst_dir=None, create_new=False,
             # Supplement trial info
             stimname = t['name'].split(' ')[0].split('.png')[0]
             t['name'] = stimname
+            t['object'] = re.findall('(\d{1})', re.search('Blob(\D+\d{1})', stimname).group(0).split('_')[1])[0] if 'morph' not in stimname else 'morph'
+
             t['size'] = round(t['size_x']/stim_aspect, 1)
             # Can be: Blob_1_RotDep_0, Blob_N2_CamRot_y-45
 
@@ -679,12 +713,17 @@ def parse_mw_file(dfn, dst_dir=None, create_new=False,
         exp_path = list(set([v.value['payload']['experiment path'] for v in exp_evs]))
         #exp_path = exp_path[0].split('/Experiment Cache/')[1]
         #re.search(r'/Experiment Cache/(.*?)/tmp', t['filename']).group(1)
-        metainfo['experiment_path']  = exp_path
+        metainfo['experiment_path']  = exp_path[0]
         metainfo['experiment']  = os.path.split(exp_path[0])[-1]
 
         #### Get protocol protocol name:
         prot_evs = [v for v in sys_evs if v.value['payload_type']==protocol_load]
-        metainfo['protocol'] = list(set([v.value['payload']['current protocol'] for v in prot_evs]))
+        pcols = list(set([v.value['payload']['current protocol'] for v in prot_evs]))
+        if len(pcols) == 0: # Protocol was not re-loaded, must be dfile "b" or other
+            pcol = ''
+        else:
+            pcol = pcols[0]
+        metainfo['protocol'] = pcol
 
         #### Save parsed
         with open(dst_outfile, 'wb') as f:
@@ -804,7 +843,8 @@ def to_trials(stim_display_events, outcome_events, outcome_key='outcome',
     return trials
 
 
-def trialdict_to_dataframe(session_trials, session='YYYYMMDD', rootdir='/n/coxfs01/behavior-data'):
+def trialdict_to_dataframe(session_trials, session='YYYYMMDD', 
+                            rootdir='/n/coxfs01/behavior-data'):
     
     trialdf = None
     dflist = []
@@ -864,8 +904,12 @@ def format_animal_data(animalid, paradigm, metadata, rootdir='/n/coxfs01/behavio
             continue
 
         for key, val in sessionobj.flags.items():
+            #print(key, val)
             if isinstance(val, list) and len(val)==1:
                 sessionobj.flags[key] = val[0]
+            elif len(np.unique(val))==1:
+                sessionobj.flags[key] = np.unique(val)[0]
+                    
             if key=='run_bounds' and isinstance(val[0], list): # conver back to tuple
                 sessionobj.flags[key] = [tval[0] for tval in val]
 
@@ -881,7 +925,7 @@ def format_animal_data(animalid, paradigm, metadata, rootdir='/n/coxfs01/behavio
         same_flag_lookup = {} 
         for flag_name, flag_value in curr_flag_states.items():
 
-            if hasattr(flag_value, "__len__"):
+            if hasattr(flag_value, "__len__") and len(flag_value)>1:
                 if flag_name not in diff_flag_lookup.keys():
                     diff_flag_lookup[flag_name] = dict()
 
@@ -963,7 +1007,8 @@ def get_metadata(paradigm, rootdir='/n/coxfs01/behavior-data', create_meta=False
             
     return metadata
 
-def load_animal_data(animalid, paradigm, metadata, rootdir='/n/coxfs01/behavior-data'):
+def load_animal_data(animalid, paradigm, metadata, create_new=False,
+                     rootdir='/n/coxfs01/behavior-data'):
 
     # --- Create or load animal datafile:
 #     cohort = str(re.findall('(\D+)', aimalid)[0])
@@ -973,18 +1018,18 @@ def load_animal_data(animalid, paradigm, metadata, rootdir='/n/coxfs01/behavior-
 
     # --- Check if processed file exists -- load or create new.
     A = Animal(animalid=animalid, experiment=paradigm, rootdir=rootdir)
-    create_new = False
+    #create_new = False
     reload_data = False
-    if os.path.exists(A.path):
+    if os.path.exists(A.path) and not create_new:
         try:
             with open(A.path, 'rb') as f:
                 A = pkl.load(f)   
         except EOFError:
-            create_new = True
+            reload_data = True
         except ImportError:
             reload_data = True
-            create_new = False
-    print(create_new, reload_data)
+    else:
+        reload_data = True
 
     print("outfile: %s" % A.path)
     

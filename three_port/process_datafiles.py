@@ -32,6 +32,30 @@ def atoi(text):
 def natural_keys(text):
     return [ atoi(c) for c in re.split('(\d+)', text) ]
 
+def get_session(animalid, session, metadata, n_processes=1, 
+                plot_each_session=False, paradigm='threeport', create_new=False,
+                response_types=['Announce_AcquirePort1', 'Announce_AcquirePort3', 'ignore'],
+                outcome_types=['success', 'ignore', 'failure'],
+                rootdir='/n/coxfs01/behavior-data'):
+
+    print("***********************************************")
+    print("ANIMAL:  %s | SESSION: %i" % (animalid, session))
+    print("***********************************************")
+    
+    # --- Get current animal session info:
+    session_meta = metadata[(metadata['animalid']==animalid) & (metadata['session']==session)].copy()
+
+    # --- process.
+    start_t = time.time()
+    S = util.get_session_data(session_meta, create_new=create_new)
+    end_t = time.time() - start_t
+    print("--> Elapsed time: {0:.2f}sec".format(end_t))
+
+    print S.flags
+
+    return S
+
+
 
 def get_sessions_for_animal(animalid, metadata, n_processes=1, plot_each_session=False,
                                paradigm='threeport', create_new=False,
@@ -59,6 +83,7 @@ def get_sessions_for_animal(animalid, metadata, n_processes=1, plot_each_session
     if create_new:
         print("!!! (Re)processing all sessions.")
         new_sessions = session_meta['session'].unique()
+
     processed_sessions = util.get_sessions_mp(new_sessions, session_meta,
                                              n_processes=n_processes, plot_each_session=plot_each_session,
                                              ignore_flags=ignore_flags,
@@ -125,10 +150,8 @@ def get_animal_df(animalid, paradigm, metadata, create_new=False, rootdir='/n/co
     return df, new_sessions
 
 
-def sessiondata_to_df(animalid, paradigm, metadata, rootdir='/n/coxfs01/behavior-data',
-                      event_names=['outcome', 'time', 'response', 'no_feedback', 'response_time', 'duration', 
-                                    'pos_x', 'pos_y', 'rotation', 'size', 'depth_rotation', 'light_position', 'name']):
-    
+def sessiondata_to_df(animalid, paradigm, metadata, rootdir='/n/coxfs01/behavior-data'):
+   
     A, new_sessions = util.load_animal_data(animalid, paradigm, metadata, rootdir=rootdir)
     if len(new_sessions)> 0:
         print("[%s] There are %i new sessions to analyze..." % (animalid, len(new_sessions)))
@@ -154,4 +177,69 @@ def sessiondata_to_df(animalid, paradigm, metadata, rootdir='/n/coxfs01/behavior
 
 
     return df, new_sessions, no_trials
+
+
+
+def extract_options(options):
+    parser = optparse.OptionParser()
+
+    # PATH opts:
+    parser.add_option('-D', '--root', action='store', dest='rootdir', default='/n/coxfs01/behavior-data', 
+                      help='root project dir containing all animalids [default: /n/coxfs01/behavior-data]')
+    parser.add_option('-i', '--animalid', action='store', dest='animalid', default=None, 
+                      help='Animal ID')
+    parser.add_option('-S', '--session', action='store', dest='session', default=None, 
+                      help='session (YYYYMMDD)')
+
+    parser.add_option('-c', '--cohort', action='store', dest='cohort', default=None, 
+                      help='cohort, e.g, AL)')
+
+    parser.add_option('-p', '--paradigm', action='store', dest='paradigm', default='threeport', 
+            help='paradigm used (default:  threeport')
+
+    parser.add_option('-n', '--nproc', action='store', dest='n_processes', default=1, 
+            help='N processes to use (default:  1)')
+
+
+    parser.add_option('--plot-session', action='store_true', dest='plot_each_session', default=False, 
+            help='flag to plot performance for each sessions')
+    parser.add_option('--new', action='store_true', dest='create_new', default=False, 
+            help='flag to reprocess sessions anew')
+
+    parser.add_option('--meta', action='store_true', dest='create_meta', default=False, 
+            help='flag to recreate metadata (if adding new datafiles)')
+ 
+    (options, args) = parser.parse_args(options)
+
+    return options
+
+
+
+
+def main(options):
+    opts = extract_options(options)
+    animalid = opts.animalid
+    session = int(opts.session) 
+    n_processes = int(opts.n_processes)
+    create_new = opts.create_new
+    create_meta = opts.create_meta
+
+    paradigm = opts.paradigm
+    plot_each_session = opts.plot_each_session
+    rootdir = opts.rootdir
+
+    #### Load metadata
+    metadata = util.get_metadata(paradigm, create_meta=create_meta)
+
+    S = get_session(animalid, session, metadata, n_processes=n_processes,
+                        plot_each_session=plot_each_session, paradigm=paradigm, 
+                        create_new=create_new)
+
+
+    print('~ done ~')
+
+
+if __name__ == '__main__':
+    main(sys.argv[1:])
+
 

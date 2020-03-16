@@ -107,30 +107,40 @@ def main(options):
             #### Process current animal
             for animalid, session_meta in metadata[metadata['cohort']==cohort].groupby(['animalid']):
                 print('[%s] - starting processing...' % animalid)
-                A = processd.get_sessions_for_animal(animalid, session_meta, paradigm=paradigm, n_processes=n_processes,
-                                              create_new=create_new, plot_each_session=plot_each_session)
+                A = processd.get_sessions_for_animal(animalid, session_meta, 
+                                                        paradigm=paradigm, 
+                                                        n_processes=n_processes,
+                                                        create_new=create_new, 
+                                                        plot_each_session=plot_each_session)
                 print("[%s] - done processing! -" % animalid)
 
                 print("[%s] - creating dataframe" % animalid)
-                df, new_s = processd.get_animal_df(animalid, paradigm, metadata, create_new=True, rootdir=rootdir)     
+                df, new_s = processd.get_animal_df(animalid, paradigm, metadata, 
+                                                    create_new=True, rootdir=rootdir)     
         else:
             print('[%s] - starting processing...' % animalid)
-            A = processd.get_sessions_for_animal(animalid, metadata, paradigm=paradigm, n_processes=n_processes,
-                                              create_new=create_new, plot_each_session=plot_each_session)
+            A = processd.get_sessions_for_animal(animalid, metadata, 
+                                                    paradigm=paradigm, 
+                                                    n_processes=n_processes,
+                                                    create_new=create_new, 
+                                                    plot_each_session=plot_each_session)
             print("[%s] - done processing! -" % animalid)
             
             print("[%s] - creating dataframe" % animalid)
-            df, new_s = processd.get_animal_df(animalid, paradigm, metadata, create_new=True, rootdir=rootdir)    
+            df, new_s = processd.get_animal_df(animalid, paradigm, metadata, 
+                                                create_new=True, rootdir=rootdir)    
       
     if make_dataframe:
         if process_cohort:
             #### Process current animal
             for animalid, session_meta in metadata[metadata['cohort']==cohort].groupby(['animalid']):
                 print("[%s] - creating dataframe" % animalid)
-                df, new_s = processd.get_animal_df(animalid, paradigm, session_meta, create_new=True, rootdir=rootdir)     
+                df, new_s = processd.get_animal_df(animalid, paradigm, session_meta, 
+                                                    create_new=True, rootdir=rootdir)     
         else:            
             print("[%s] - creating dataframe" % animalid)
-            df, new_s = processd.get_animal_df(animalid, paradigm, metadata, create_new=True, rootdir=rootdir)    
+            df, new_s = processd.get_animal_df(animalid, paradigm, metadata, 
+                                                create_new=True, rootdir=rootdir)    
  
 
     print("~~~ done! ~~~")
