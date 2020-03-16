@@ -72,16 +72,20 @@ def parse_datafile_name(dfn):
     assert len(fparts) >= 2, "*Warning* Unknown naming fmt: %s" % str(fparts)
     animalid = fparts[0]
     datestr = re.search('(\d+)', fparts[1]).group(0)
+    trail_str = re.findall('(\D+)', fparts[1])
+    suffix = '' if len(trail_str)==0 else trail_str[0]
 
     # Make sure no exra letters are in the datestr (for parta, b, etc.)
     if not datestr.isdigit():
         datestr = re.split(r'\D', datestr)[0] # cut off any letter suffix
+        suffix = re.split(r'\d', datestr)[-1]
+        print(datestr, suffix)
     if len(datestr) == 6:
         session = '20%s' % datestr 
     elif len(datestr) == 8:
         session = datestr 
 
-    return animalid, session
+    return animalid, session, suffix
 
 
 def get_run_time(df):
@@ -179,88 +183,71 @@ class Session():
         print("Session: %s" % self.session)
         print("Source: ", self.source)
     
-    def get_trials(self, 
+    def get_trials(self, create_new=False,
                      ignore_flags=None,
                      response_types=['Announce_AcquirePort1', 'Announce_AcquirePort3', 'ignore'],
                      outcome_types=['success', 'failure', 'ignore']):
                     # If there is no "abort" use "Announce_TrialEnd" ? -- these should be "aborted" trials?
         
+        flags = {}
+        meta = {}
         #### Parse trials and outcomes
         trials = []
-        flags = {}
         tmp_flags = []
-        if isinstance(self.source, list) and len(self.source) > 1:
-            for dfn in self.source:
-                curr_trials, curr_flags, df = parse_trials(dfn, response_types=response_types, 
-                                                       outcome_types=outcome_types,
-                                                       ignore_flags=ignore_flags)
-                if curr_trials is not None:
-                    trials.extend(curr_trials)
-                    tmp_flags.append(curr_flags)
-                    
-            # Combine flag values across data files:
-            if len(tmp_flags) > 0:
-                flags = {
-                    k: [d.get(k) for d in tmp_flags]
-                    for k in set().union(*tmp_flags)
-                }
-            for k, v in flags.items():
-                if k=='run_bounds':
-                    # keep separte so we know when datafile splits happen
-                    continue
-                # Combine single-values and get unique
-                if len(v)>1:
-                    u_vals = np.unique([vv for vv in v])
-                    if len(u_vals)==1:
-                        u_vals=u_vals[0]
-                    flags[k] = u_vals 
-        else:
-            # Open data file:
-            dfn = self.source[0]
-            trials, flags, df = parse_trials(dfn, response_types=response_types, 
-                                         outcome_types=outcome_types,
-                                         ignore_flags=ignore_flags)
+        tmp_meta = []
+        #if isinstance(self.source, list) and len(self.source) > 1:
+        for dfn in self.source:
+            print('--> %s' % dfn)
+            curr_trials, curr_flags, curr_meta = parse_mw_file(dfn, create_new=create_new,
+                                                               response_types=response_types, 
+                                                               outcome_types=outcome_types,
+                                                               ignore_flags=ignore_flags)
+            if curr_trials is not None:
+                trials.extend(curr_trials)
+                tmp_flags.append(curr_flags)
+                tmp_meta.append(curr_meta)
+
+        # Combine flag values across data files:
+        if len(tmp_flags) > 0:
+            flags = {k: [d.get(k) for d in tmp_flags] for k in set().union(*tmp_flags)}
+        if len(tmp_meta) > 0:
+            meta = {k: [d.get(k) for d in tmp_meta] for k in set().union(*tmp_meta)}
+
+        # Clean up dicts
+        for k, v in meta.items():
+            if len(v) == 1:
+                meta[k] = v[0]
+
+        for k, v in flags.items():
+            if k=='run_bounds':
+                # keep separate so we know when datafile splits happen
+                continue
+            # Combine single-values and get unique
+            if len(v)>1:
+                u_vals = np.unique([vv for vv in v])
+                if len(u_vals)==1:
+                    u_vals=u_vals[0]
+                flags[k] = u_vals 
+#         else:
+#             # Open data file:
+#             dfn = self.source[0]
+#             trials, flags, df = parse_trials(dfn, response_types=response_types, 
+#                                          outcome_types=outcome_types,
+#                                          ignore_flags=ignore_flags)
         self.trials = trials
         self.flags = flags
 
-        #### Get current session server info while df open:
-        server_address = df.get_events('#serialBridgeAddress')[-1].value
-        server_name = df.get_events('#serverName')[-1].value
-        self.server =  {'address': server_address, 'name': server_name}
-        
-        #### Get screen info
-        screen_info = get_screen_info(df, run_bounds=self.flags['run_bounds'])
-        self.screen = screen_info
-        
-        
-        #### Save experiment and protocol info:
-        # [(payload_type, event_type)]:  [(4013, 1002), (2001, 1001), (4007, 1002)] # 1002:  Datafile creation
-        experiment_load = 4013 #:  Looks like which experiment file(s) loaded (.mwk)
-        protocol_load = 2001 #:  Which protocols found and which loaded
-        sys_evs = df.get_events('#systemEvent')
-        
-        #### Get experiment name:
-        exp_evs = [v for v in sys_evs if v.value['payload_type']==experiment_load]
-        exp_path = list(set([v.value['payload']['experiment path'] for v in exp_evs]))
-        #assert len(exp_path) == 1, "*ERROR* More than 1 experiment loaded..."
-        #exp_path = exp_path[0].split('/Experiment Cache/')[1]
-        self.experiment_path = exp_path
-        
-        #re.search(r'/Experiment Cache/(.*?)/tmp', t['filename']).group(1)
-        self.experiment = os.path.split(exp_path[0])[-1]
+        self.server =  {'address': meta['address'], 'name': meta['server']}
+        self.screen = meta['screen'] 
+        self.experiment_path = meta['experiment_path'] 
+        self.experiment = meta['experiment'] 
+        self.protocol = meta['protocol']
 
-        #### Get protocol protocol name:
-        prot_evs = [v for v in sys_evs if v.value['payload_type']==protocol_load]
-        protocol = list(set([v.value['payload']['current protocol'] for v in prot_evs]))
-        #assert len(protocol) == 1, "*ERROR* More than 1 protocol loaded..."
-        #protocol = protocol[0]
-        self.protocol = protocol
-
-        return trials
+        return trials, flags, meta
     
     def print_session_summary(self):
         if self.experiment_path is None:
-            print("No trials loaded. Run:  parse_trials()")
+            print("No trials loaded. Run:  parse_mw_file()")
         else:        
             print("Experiment: %s" % (self.experiment_path))
             print("Protocol: %s [server: %s]" % (self.protocol, self.server['name']))
@@ -330,8 +317,6 @@ class Session():
         if counts is not None:
             values = [('%s_%s' % ('_'.join(stim.split('_')[0:2]), stim.split('_')[3]), \
                        counts[stim]['nsuccess']/float(counts[stim]['ntrials'])) for stim in stimulus_list]
-            #print values
-
             pl.figure()
             if 'CamRot' in stimulus_list[0]:
                 blob1 = [(int(v[0].split('_')[-1][1:]), v[1]) for v in values if blob1_name in v[0]]
@@ -372,7 +357,7 @@ class Session():
 
 
 
-def process_sessions_mp(new_sessions, session_meta, dst_dir='/tmp',
+def get_sessions_mp(new_sessions, session_meta, dst_dir='/tmp',
                          n_processes=1, plot_each_session=False,
                          ignore_flags=None,
                          response_types=['Announce_AcquirePort1', 'Announce_AcquirePort3', 'ignore'],
@@ -384,7 +369,7 @@ def process_sessions_mp(new_sessions, session_meta, dst_dir='/tmp',
         for session in curr_sessions:
             curr_sessionmeta = session_meta[session_meta.session==session] #session_info[datestr]
             print(curr_sessionmeta)
-            S = process_session(curr_sessionmeta, 
+            S = get_session_data(curr_sessionmeta, 
                                 dst_dir=dst_dir,
                                 ignore_flags=ignore_flags,
                                 response_types=response_types, 
@@ -437,7 +422,7 @@ def process_sessions_mp(new_sessions, session_meta, dst_dir='/tmp',
         
     return processed_dict
 
-def process_session(session_meta, dst_dir='/tmp',
+def get_session_data(session_meta, dst_dir='/tmp', 
                     response_types=['Announce_AcquirePort1', 'Announce_AcquirePort3', 'ignore'],
                     outcome_types=['success', 'ignore', 'failure'],
                     ignore_flags=None, create_new=False, plot_each_session=False):
@@ -448,38 +433,38 @@ def process_session(session_meta, dst_dir='/tmp',
 
     # Create output dir for processed data
     src_dir = S.source[0] if isinstance(S.source, list) else S.source
-
     if dst_dir is None or dst_dir == '/tmp':
         dst_dir = os.path.join(S.source[0].split('/raw')[0], 'processed')
         dst_dir_figures = os.path.join(dst_dir, 'figures')
+        dst_dir_processed = os.path.join(dst_dir, 'tmp_files')
         if not os.path.exists(dst_dir_figures):
             os.makedirs(dst_dir_figures)
-    #print("Saving processed output to: %s" % dst_dir)
-
-    # Check if session data exists
-    tmp_file_dir = os.path.join(dst_dir_figures, 'tmp_files')
-    if not os.path.exists(tmp_file_dir): os.makedirs(tmp_file_dir)
-    tmp_processed_file = os.path.join(tmp_file_dir, 'proc_%s_%s.pkl' % (S.animalid, S.session))
-    parse_data=False
-    if os.path.exists(tmp_processed_file) and (create_new is False):
-        print("... loading existing parsed session file")
-        try:
-            with open(tmp_processed_file, 'rb') as f:
-                S = pkl.load(f)
-        except ImportError:
-            parse_data=True
-    else:
-        parse_data = True
-
-    if parse_data or create_new:
-        S.get_trials(response_types=['Announce_AcquirePort1', 'Announce_AcquirePort3', 'ignore'], \
-                     outcome_types = ['success', 'ignore', 'failure'])
-        S.get_summary() #S.get_counts_by_stimulus()
+        if not os.path.exists(dst_dir_processed):
+            os.makedirs(dst_dir_processed)
             
+    # Check if session data exists
+    #tmp_processed_file = os.path.join(dst_dir_processed, 'proc_%s_%s.pkl' % (S.animalid, S.session))
+#    tmp_processed_file = os.path.join(dst_dir_processed, 'proc_%s.pkl' % (S.animalid, S.session))
+#    parse_data=False
+#    if os.path.exists(tmp_processed_file) and (create_new is False):
+#        print("... loading existing parsed session file")
+#        try:
+#            with open(tmp_processed_file, 'rb') as f:
+#                S = pkl.load(f)
+#        except ImportError:
+#            parse_data=True
+#    else:
+#        parse_data = True
+#
+    #if parse_data or create_new:
+    S.get_trials(response_types=['Announce_AcquirePort1', 'Announce_AcquirePort3', 'ignore'], \
+                 outcome_types = ['success', 'ignore', 'failure'])
+    S.get_summary()
+        
         # Save tmp file:
-        with open(tmp_processed_file, 'wb') as f:
-            pkl.dump(S, f, protocol=pkl.HIGHEST_PROTOCOL)
-     
+#        with open(tmp_processed_file, 'wb') as f:
+#            pkl.dump(S, f, protocol=pkl.HIGHEST_PROTOCOL)
+#     
     if S.summary is None or S.summary['ntrials'] == 0:
         print("--- no trials ---")
         return None
@@ -493,199 +478,219 @@ def process_session(session_meta, dst_dir='/tmp',
            
     return S
 
-def parse_trials(dfn, response_types=['Announce_AcquirePort1', 'Announce_AcquirePort3', 'ignore'], \
+def parse_mw_file(dfn, dst_dir=None, create_new=False,
+                 response_types=['Announce_AcquirePort1', 'Announce_AcquirePort3', 'ignore'], \
                  outcome_types = ['success', 'ignore', 'failure'],\
                  ignore_flags=[], remove_orphans=True):
-    
+   
+    trials = []
+    metainfo = {}
+    flags = {}
+
     stim_blacklists = [
         lambda s: (('type' in s.keys()) and (s['type'] == 'blankscreen')),
         ]
-
-    print "***** Parsing trials *****"
-    df = pymworks.open(dfn)
     
-#     # Separate behavior-training flag states from current trial states
-    ignore_flags = []
-#     if ignore_flags is None or len(ignore_flags)==0:
-#         codec = df.get_codec()
-#         ignore_flags = []
-#         all_flags = [f for f in codec.values() if 'Flag' in f or 'flag' in f]
-#         for fl in all_flags:
-#             evs = df.get_events(fl)
-#             vals = list(set([v.value for v in evs]))
-#             if len(vals) > 1 or len(evs) > 5:
-#                 ignore_flags.append(fl)
-        
-    # Get run bounds:
-    bounds = get_run_time(df)
-    if bounds is None:
-        return None, None, df
-
-    trials = []; flag_list = []; flags = {};
-    for bound in bounds:
-        
-        if (bound[1]-bound[0])/1E6 < 2.0:
-            continue
+    # Set output dirs
+    if dst_dir is None:
+        processed_dir = os.path.join(dfn.split('/raw')[0], 'processed')
+        dst_dir = os.path.join(processed_dir, 'tmp_files')
+    if not os.path.exists(dst_dir):
+        os.makedirs(dst_dir)
+    dst_fname = '%s.pkl' % os.path.splitext(os.path.split(dfn)[-1])[0]
+    dst_outfile = os.path.join(dst_dir, dst_fname)
+   
+    do_parsing=False
+    if not create_new and os.path.exists(dst_outfile):
+        with open(dst_outfile, 'rb') as f:
+            tmp_sdict = pkl.load(f)
+        trials = tmp_sdict['trials']
+        flags = tmp_sdict['flags']
+        metainfo = tmp_sdict['meta']
+    else:
+        do_parsing = True
             
-        # Identify no feedback conditions
-        #  231: 'nofeedback_depth_rotation_min',
-        #  232: 'nofeedback_depth_rotation_max',
-        #  233: 'nofeedback_size_min',
-        #  234: 'nofeedback_size_max',
-        if 'nofeedback_depth_rotation_min' not in df.get_codec().values():
-            always_feedback = True
-        else:
-            always_feedback = False
-            no_fb_params_tmp = df.get_events(['nofeedback_size_min',
-                                           'nofeedback_size_max',
-                                           'nofeedback_depth_rotation_min',
-                                           'nofeedback_depth_rotation_max'])
-            fb_info = list(set([(e.name, e.value) for e in no_fb_params_tmp]))
-            no_fb = {}
-            for fb in fb_info:
-                param = '_'.join(fb[0].split('_')[1:-1])
-                if param not in no_fb.keys():
-                    no_fb[param] = [fb[1]]
+    if do_parsing:
+        print "***** Parsing trials *****"
+        print("-- saving tmp outfile to: %s" % (dst_outfile))
+        df = pymworks.open(dfn)
+
+        # Get run bounds:
+        bounds = get_run_time(df)
+        if bounds is None:
+            return None, None, df
+
+        trials = []; flag_list = []; flags = {};
+        for bound in bounds:
+            if (bound[1]-bound[0])/1E6 < 2.0:
+                continue
+
+            # Identify no feedback conditions
+            if 'nofeedback_depth_rotation_min' not in df.get_codec().values():
+                always_feedback = True
+            else:
+                always_feedback = False
+                no_fb_params_tmp = df.get_events(['nofeedback_size_min',
+                                               'nofeedback_size_max',
+                                               'nofeedback_depth_rotation_min',
+                                               'nofeedback_depth_rotation_max'])
+                fb_info = list(set([(e.name, e.value) for e in no_fb_params_tmp]))
+                no_fb = {}
+                for fb in fb_info:
+                    param = '_'.join(fb[0].split('_')[1:-1])
+                    if param not in no_fb.keys():
+                        no_fb[param] = [fb[1]]
+                    else:
+                        no_fb[param].append(fb[1])
+
+            # Get display events:
+            tmp_devs = df.get_events('#stimDisplayUpdate')                     
+            tmp_devs = [i for i in tmp_devs if bound[0] <= i['time']<= bound[1]] 
+
+            # Separate behavior-training flag states from current trial states
+            codec = df.get_codec()
+            all_flags = [f for f in codec.values() if 'Flag' in f or 'flag' in f]
+            ignore_flags_with_name = ['Curr', 'current', 'Current', 'curr']
+            ignore_flags = [f for f in all_flags if any([fstr in f for fstr in ignore_flags_with_name])]
+            flag_names = [f for f in all_flags if f not in ignore_flags]
+            tmp_flags = dict((flag, None) for flag in flag_names)
+            for flag in flag_names:
+                if flag == 'FlagNoFeedbackInCurrentTrial': continue
+                found_values = np.unique([e.value for e in df.get_events(flag) if bound[0] < e.time <bound[1]])
+                if len(found_values) > 1: #or (len(list(set(found_values)))) > 1:
+                    print("More than 1 value found for flag: %s" % flag)
+                    # Take last value
+                    last_found_val = [e.value for e in sorted(df.get_events(flag), key=lambda x: x.time)][-1]
+                    tmp_flags[flag] = int(last_found_val)
+                elif (len(found_values) == 1): # or (len(list(set(found_values)))) == 1:
+                    tmp_flags[flag] = int(found_values[0])
                 else:
-                    no_fb[param].append(fb[1])
-        
-        # Get display events:
-        tmp_devs = df.get_events('#stimDisplayUpdate')                     
-        tmp_devs = [i for i in tmp_devs if bound[0] <= i['time']<= bound[1]] 
+                    tmp_flags[flag] = found_values
 
-        # Get behavior flags:
-        codec = df.get_codec()
-        all_flags = [f for f in codec.values() if 'Flag' in f or 'flag' in f]
-        ignore_flags_with_name = ['Curr', 'current', 'Current', 'curr']
-        ignore_flags = [f for f in all_flags if any([fstr in f for fstr in ignore_flags_with_name])]
-        flag_names = [f for f in all_flags if f not in ignore_flags]
-        tmp_flags = dict((flag, None) for flag in flag_names)
-        for flag in flag_names:
-            if flag == 'FlagNoFeedbackInCurrentTrial': continue
-            found_values = np.unique([e.value for e in df.get_events(flag) if bound[0] < e.time <bound[1]])
-            if len(found_values) > 1: #or (len(list(set(found_values)))) > 1:
-                print("More than 1 value found for flag: %s" % flag)
-                # Take last value
-                last_found_val = [e.value for e in sorted(df.get_events(flag), key=lambda x: x.time)][-1]
-                tmp_flags[flag] = int(last_found_val)
-            elif (len(found_values) == 1): # or (len(list(set(found_values)))) == 1:
-                tmp_flags[flag] = int(found_values[0])
+            # Check for valid response types and get all response events:
+            response_types = [r for r in response_types if r in codec.values()]
+            response_evs = [e for e in df.get_events(response_types) if e.value==1]
+            outcome_evs = [e for e in df.get_events(outcome_types) if e.value==1]
+
+            # Sync response events to true outcome events:  response occurs after stimulus, stimulus is the master
+            # Convert to trials: match stimulus events and response events:
+            outcome_key = 'response'
+            responses = to_trials(tmp_devs, response_evs, outcome_key=outcome_key,
+                                                       duration_multiplier=1.,
+                                                       stim_blacklists=stim_blacklists,
+                                                       remove_unknown=True)
+
+            # **sync outcome events to response events as master (direction 1=slave after master, -1=slave before master)
+            outcomes = pymworks.events.utils.sync(outcome_evs, responses, direction=1, mkey=lambda x: x['response_time'])
+            print "N total response events: ", len(responses)
+            print "N total outcome events: ", len(outcomes)
+
+            assert len(responses) == len(outcomes), "**ERROR:  N responses (%i) != N outcomes (%i)" % (len(responses), len(outcomes))
+            tmp_trials = copy.copy(responses)
+            for trial_ix, (response, outcome) in enumerate(zip(responses, outcomes)):
+                if outcome is not None:
+                    tmp_trials[trial_ix].update({'outcome': outcome.name, 'outcome_time': outcome.time}) #['outcome']})
+                else:
+                    tmp_trials[trial_ix].update({'outcome': 'unknown'})
+
+            # Get rid of display events without known outcome within 'duration_multiplier' time
+            if remove_orphans:                                                  
+                orphans = [(i,x) for i,x in enumerate(tmp_trials) if\
+                            x['outcome']=='unknown' or x['%s' % outcome_key]=='unknown']
+                tmp_trials = [t for t in tmp_trials if not t['outcome']=='unknown']
+                tmp_trials = [t for t in tmp_trials if not t['%s' % outcome_key]=='unknown']
+
+                print "Found and removed %i orphan stimulus events in file %s" % (len(orphans), df.filename)
+                print "N valid trials: %i" % len(tmp_trials)
+
+            # Add current trials in chunk to trials list:
+            trials.extend(tmp_trials)
+
+            if len(tmp_trials) > 0:
+                # Add current flag values to flags list:
+                flag_list.append(tmp_flags)
+                # Add boundary time to flag info:
+                tmp_flags.update({'run_bounds': bound})
+
+        if len(trials) == 0:
+            return trials, flags, df
+
+        for t in trials:
+            stim_aspect = [v.value for v in df.get_events('StimAspectRatio')][-1]
+            assert t['response_time'] < t['outcome_time'], "**ERROR: Mismatch in response/outcome alignment"
+
+            # Supplement trial info
+            stimname = t['name'].split(' ')[0].split('.png')[0]
+            t['name'] = stimname
+            t['size'] = round(t['size_x']/stim_aspect, 1)
+            # Can be: Blob_1_RotDep_0, Blob_N2_CamRot_y-45
+
+            if 'RotDep' in stimname:
+                drot_str = stimname.split('_')[-1]
+                depthrot_value = int(drot_str)
+                t['depth_rotation'] = depthrot_value #Blob_N2_CamRot_y-45
+            elif 'CamRot' in stimname and 'LighPos' in stimname:
+                depthrot_value = int(stimname.split('CamRot_y')[1].split('_')[0])
+                lightpos_value = tuple([int(i) for i in re.findall("[-\d]+", stimname.split('LighPos')[1])])
+                t['depth_rotation'] = depthrot_value #Blob_N2_CamRot_y-45
+                t['light_position'] = lightpos_value
+            elif 'CamRot' in stimname:
+                depthrot_value = int(stimname.split('CamRot_y')[1].split('_')[0])
+                t['depth_rotation'] = depthrot_value #Blob_N2_CamRot_y-45
+            elif 'morph' in stimname:
+                t['depth_rotation']=0
+
+            # Check if no feedback
+            if always_feedback:
+                t['no_feedback'] = False
             else:
-                tmp_flags[flag] = found_values
-            #    tmp_flags.pop(flag)
+                t['no_feedback'] = all([np.min(lims) < t[k] < np.max(lims) for k, lims in no_fb.items()])
+
+        # Combine all flag states:
+        # Combine flag values across data files:
+        if len(flag_list) > 0:
+            flags = {
+                k: [d.get(k) for d in flag_list]
+                for k in set().union(*flag_list)
+            }
+
+        #### Get current session server info while df open:
+        server_address = df.get_events('#serialBridgeAddress')[-1].value
+        server_name = df.get_events('#serverName')[-1].value
+        metainfo['address'] = server_address
+        metainfo['server'] = server_name
         
-        # Check for valid response types and get all response events:
-        response_types = [r for r in response_types if r in codec.values()]
-        response_evs = [e for e in df.get_events(response_types) if e.value==1] #if (bound[0] < e['time'] < bound[1]) and e.value==1]    
-        outcome_evs = [e for e in df.get_events(outcome_types) if e.value==1] #if (bound[0] < e['time'] < bound[1]) and e.value is not None and e.value != 0] #not in [0, None]]  
-        print(len(response_evs), len(outcome_evs))
-
-        # Sync response events to true outcome events:  response occurs after stimulus, stimulus is the master
-        # Convert to trials: match stimulus events and response events:
-        outcome_key = 'response'
-        responses = to_trials(tmp_devs, response_evs, outcome_key=outcome_key,
-                                                   duration_multiplier=1.,
-                                                   stim_blacklists=stim_blacklists,
-                                                   remove_unknown=True)
-
-        # **sync outcome events to response events as master (direction 1=slave after master, -1=slave before master)
-        #outcome_evs = [e for e in df.get_events(outcome_types) if (bound[0] < e['time'] < bound[1]) and e.value!=0]
-        outcomes = pymworks.events.utils.sync(outcome_evs, responses, direction=1, mkey=lambda x: x['response_time'])
-
-        print "N total response events: ", len(responses)
-        print "N total outcome events: ", len(outcomes)
-
-        assert len(responses) == len(outcomes), "**ERROR:  N responses (%i) != N outcomes (%i)" % (len(responses), len(outcomes))
-        tmp_trials = copy.copy(responses)
-        for trial_ix, (response, outcome) in enumerate(zip(responses, outcomes)):
-            if outcome is not None:
-                tmp_trials[trial_ix].update({'outcome': outcome.name, 'outcome_time': outcome.time}) #['outcome']})
-            else:
-                tmp_trials[trial_ix].update({'outcome': 'unknown'})
-
-        # Get rid of display events without known outcome within 'duration_multiplier' time
-        if remove_orphans:                                                  
-            orphans = [(i,x) for i,x in enumerate(tmp_trials) if\
-                        x['outcome']=='unknown' or x['%s' % outcome_key]=='unknown']
-            tmp_trials = [t for t in tmp_trials if not t['outcome']=='unknown']
-            tmp_trials = [t for t in tmp_trials if not t['%s' % outcome_key]=='unknown']
-
-            print "Found and removed %i orphan stimulus events in file %s" % (len(orphans), df.filename)
-            print "N valid trials: %i" % len(tmp_trials)
         
-        # Add current trials in chunk to trials list:
-        trials.extend(tmp_trials)
+        #### Get screen info
+        screen_info = get_screen_info(df, run_bounds=flags['run_bounds'])
+        metainfo['screen'] = screen_info
         
-        if len(tmp_trials) > 0:
-            # Add current flag values to flags list:
-            flag_list.append(tmp_flags)
-
-            # Add boundary time to flag info:
-            tmp_flags.update({'run_bounds': bound})
-
+        #### Save experiment and protocol info:
+        # [(payload_type, event_type)]:  [(4013, 1002), (2001, 1001), (4007, 1002)] # 1002:  Datafile creation
+        experiment_load = 4013 #:  Looks like which experiment file(s) loaded (.mwk)
+        protocol_load = 2001 #:  Which protocols found and which loaded
+        sys_evs = df.get_events('#systemEvent')
         
-    if len(trials) == 0:
-        return trials, flags, df
+        #### Get experiment name:
+        exp_evs = [v for v in sys_evs if v.value['payload_type']==experiment_load]
+        exp_path = list(set([v.value['payload']['experiment path'] for v in exp_evs]))
+        #exp_path = exp_path[0].split('/Experiment Cache/')[1]
+        #re.search(r'/Experiment Cache/(.*?)/tmp', t['filename']).group(1)
+        metainfo['experiment_path']  = exp_path
+        metainfo['experiment']  = os.path.split(exp_path[0])[-1]
+
+        #### Get protocol protocol name:
+        prot_evs = [v for v in sys_evs if v.value['payload_type']==protocol_load]
+        metainfo['protocol'] = list(set([v.value['payload']['current protocol'] for v in prot_evs]))
+
+        #### Save parsed
+        with open(dst_outfile, 'wb') as f:
+            pkl.dump({'trials': trials, 
+                      'flags': flags, 
+                      'meta': metainfo,
+                      'source': dfn}, f, protocol=pkl.HIGHEST_PROTOCOL)
     
-    for t in trials:
-        stim_aspect = [v.value for v in df.get_events('StimAspectRatio')][-1]
-        assert t['response_time'] < t['outcome_time'], "**ERROR: Mismatch in response/outcome alignment"
-
-        # Supplement trial info
-        stimname = t['name'].split(' ')[0].split('.png')[0]
-        t['name'] = stimname
-        # Can be: Blob_1_RotDep_0, Blob_N2_CamRot_y-45
-        
-        if 'RotDep' in stimname:
-            drot_str = stimname.split('_')[-1]
-            depthrot_value = int(drot_str)
-            t['depth_rotation'] = depthrot_value #Blob_N2_CamRot_y-45
-        elif 'CamRot' in stimname and 'LighPos' in stimname:
-            depthrot_value = int(stimname.split('CamRot_y')[1].split('_')[0])
-            lightpos_value = tuple([int(i) for i in re.findall("[-\d]+", stimname.split('LighPos')[1])])
-            t['depth_rotation'] = depthrot_value #Blob_N2_CamRot_y-45
-            t['light_position'] = lightpos_value
-        elif 'CamRot' in stimname:
-            depthrot_value = int(stimname.split('CamRot_y')[1].split('_')[0])
-            t['depth_rotation'] = depthrot_value #Blob_N2_CamRot_y-45
-        elif 'morph' in stimname:
-            t['depth_rotation']=0
-            
-#         if 'y' in drot_str:
-#             depthrot_value = int(drot_str[1:])
-#         else:
-#             depthrot_value = int(drot_str)
-                    
-        t['size'] = round(t['size_x']/stim_aspect, 1)
-
-        # Check if no feedback
-        if always_feedback:
-            t['no_feedback'] = False
-        else:
-            t['no_feedback'] = all([np.min(lims) < t[k] < np.max(lims) for k, lims in no_fb.items()])
-
-    # Combine all flag states:
-    # Combine flag values across data files:
-    if len(flag_list) > 0:
-        flags = {
-            k: [d.get(k) for d in flag_list]
-            for k in set().union(*flag_list)
-        }
-        
-#     for fi, flag_dict in enumerate(flag_list):
-#         if fi == 0:
-#             flags = copy.copy(flag_dict)
-#         else:
-#             for flag_name, flag_value in flag_dict.items():
-#                 print(flag_name, flag_value)
-#                 existing_value = flags[flag_name] #.value()
-#                 if flag_value == existing_value:
-#                     continue
-#                 if not isinstance(flags[flag_name], list):
-#                     flags[flag_name] = [flags[flag_name]]
-#                 flags[flag_name].append(flag_value)
-            
-    return trials, flags, df
+    return trials, flags, metainfo
 
 
 # def to_stims(events, as_dicts=True, blacklist=None):
@@ -816,6 +821,7 @@ def trialdict_to_dataframe(session_trials, session='YYYYMMDD', rootdir='/n/coxfs
 
 def animal_data_to_dataframe(A):
 
+    df = None
     dflist = []
     for si, (session, sessionobj) in enumerate(A.sessions.items()):
         if si % 20 == 0:
@@ -825,7 +831,8 @@ def animal_data_to_dataframe(A):
         if tmpdf is not None:
             dflist.append(tmpdf)
 
-    df = pd.concat(dflist, axis=0)
+    if len(dflist) > 0:
+        df = pd.concat(dflist, axis=0)
     
     return df
 
@@ -943,6 +950,7 @@ def get_metadata(paradigm, rootdir='/n/coxfs01/behavior-data', create_meta=False
         #### Get all animals and sessions
         metadata = pd.concat([pd.DataFrame({'animalid': parse_datafile_name(fn)[0],
                                           'session': int(parse_datafile_name(fn)[1]),
+                                           'suffix': parse_datafile_name(fn)[-1],
                                           'datasource': fn, 
                                           'cohort': parse_datafile_name(fn)[0][0:2]}, index=[i]) \
                                            for i, fn in enumerate(raw_fns)], axis=0)
