@@ -34,11 +34,14 @@ def get_screen_info(df, run_bounds=None):
     if run_bounds is None:
         run_bounds = get_run_time(df)
         assert len(run_bounds) > 0, "ABORT. No run times found: %s" % df.filename
-        
+       
+    print run_bounds 
     if isinstance(run_bounds, list) and len(run_bounds)==1:
         run_mode_times = run_bounds[0]
     elif isinstance(run_bounds, list) and len(run_bounds) > 1:
-        run_mode_times = (run_bounds[0][0], run_bounds[-1][1])
+        starts = [r[0][0] for r in run_bounds]
+        ends = [r[-1][1] for r in run_bounds]
+        run_mode_times =(starts[0], ends[-1]) # run_bounds[-1][1])
     elif isinstance(run_bounds, tuple):
         run_mode_times = run_bounds
         
