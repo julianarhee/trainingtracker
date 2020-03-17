@@ -204,7 +204,10 @@ class Session():
                                                                response_types=response_types, 
                                                                outcome_types=outcome_types,
                                                                ignore_flags=ignore_flags)
-            
+           
+            if curr_meta is None:
+                return None, None, -1
+ 
             if curr_trials is not None:
                 curr_suffix = self.suffix[dfn]
                 for t in curr_trials:
@@ -472,8 +475,12 @@ def get_session_data(session_meta, dst_dir='/tmp',
 #        parse_data = True
 #
     #if parse_data or create_new:
-    S.get_trials(response_types=['Announce_AcquirePort1', 'Announce_AcquirePort3', 'ignore'], \
+    _, _, metastate = S.get_trials(response_types=['Announce_AcquirePort1', 'Announce_AcquirePort3', 'ignore'], \
                  outcome_types = ['success', 'ignore', 'failure'], create_new=create_new)
+
+    if metastate == -1:
+        # Broken datafile
+        return -1
 
     if S.trials is not None:
             
@@ -531,7 +538,14 @@ def parse_mw_file(dfn, dst_dir=None, create_new=False,
     if do_parsing:
         print "***** Parsing trials *****"
         print("-- saving tmp outfile to: %s" % (dst_outfile))
-        df = pymworks.open(dfn)
+        df = None
+        try:
+            df = pymworks.open(dfn)
+        except Exception as KeyError:
+            print('--- unable to open file: %s' % dfn)
+            print('ABORTING.')
+        if df is None:
+            return None, None, None 
         codec = df.get_codec()
 
         # Get run bounds:
@@ -917,13 +931,18 @@ def format_animal_data(animalid, paradigm, metadata, rootdir='/n/coxfs01/behavio
         if sessionobj is None:
             A.sessions.pop(session)
             continue
+        elif sessionobj == -1:
+            print("Bad datafile %s" % session)
+            A.sessions.pop(session)
+            continue
+
         elif sessionobj.trials is None or len(sessionobj.trials)==0:
             print(session, 'no trials')
             A.sessions.pop(session)
             continue
 
         for key, val in sessionobj.flags.items():
-            print(key, val)
+            #print(key, val)
             if isinstance(val, list) and len(val)==1:
                 sessionobj.flags[key] = val[0]
             elif len(np.unique(val))==1:
@@ -959,7 +978,7 @@ def format_animal_data(animalid, paradigm, metadata, rootdir='/n/coxfs01/behavio
                 for rbounds, currval in zip(sessionobj.flags['run_bounds'], flag_value):
                     print(rbounds)
                     tmp_trial_ixs = [ti for ti, trial in enumerate(sessionobj.trials) if rbounds[0] < trial['time'] < rbounds[1]]
-                    print(session, flag_name, currval, len(tmp_trial_ixs))
+                    #print(session, flag_name, currval, len(tmp_trial_ixs))
                     if len(tmp_trial_ixs) > 0:
                         diff_flag_lookup[flag_name][currval] = np.array(tmp_trial_ixs)
                     else:
@@ -1014,7 +1033,12 @@ def get_metadata(paradigm, rootdir='/n/coxfs01/behavior-data', create_meta=False
     if create_meta or reload_meta:
         print("Creating new metadata...")
         ### All raw datafiles
-        raw_fns = glob.glob(os.path.join(rootdir, paradigm, 'cohort_data', 'A*', 'raw', '*.mwk'))
+        all_fns = glob.glob(os.path.join(rootdir, paradigm, 'cohort_data', 'A*', 'raw', '*.mwk'))
+        # --- exclude broken dfiles for now:
+        excluded_dfiles = ['AK4_170907.mwk']
+        print("--- excluding:", excluded_dfiles)
+ 
+        raw_fns = [f for f in all_fns if os.path.split(f)[-1] not in excluded_dfiles]
 
         #### Get all animals and sessions
         metadata = pd.concat([pd.DataFrame({'animalid': parse_datafile_name(fn)[0],
