@@ -186,7 +186,7 @@ class Session():
         print("Source: ", self.source)
     
     def get_trials(self, create_new=False,
-                     ignore_flags=None,
+                     ignore_flags=None, verbose=True,
                      response_types=['Announce_AcquirePort1', 'Announce_AcquirePort3', 'ignore'],
                      outcome_types=['success', 'failure', 'ignore']):
                     # If there is no "abort" use "Announce_TrialEnd" ? -- these should be "aborted" trials?
@@ -199,7 +199,8 @@ class Session():
         tmp_meta = []
         #if isinstance(self.source, list) and len(self.source) > 1:
         for di, dfn in enumerate(sorted(self.source, key=natural_keys)):
-            print('--> [%i] of %i: %s' % (int(di+1), len(self.source), dfn))
+            if verbose:
+                print('--> [%i] of %i: %s' % (int(di+1), len(self.source), dfn))
             curr_trials, curr_flags, curr_meta = parse_mw_file(dfn, create_new=create_new,
                                                                response_types=response_types, 
                                                                outcome_types=outcome_types,
@@ -222,7 +223,7 @@ class Session():
         if len(tmp_meta) > 0:
             meta = {k: [d.get(k) for d in tmp_meta] for k in set().union(*tmp_meta)}
 
-        print("---")
+        #print("---")
         #print(flags)
         # Clean up dicts
         for k, v in meta.items():
@@ -1019,12 +1020,15 @@ def format_animal_data(animalid, paradigm, metadata, rootdir='/n/coxfs01/behavio
 
 
 
-def get_metadata(paradigm, rootdir='/n/coxfs01/behavior-data', create_meta=False):
-    meta_datafile = os.path.join(rootdir, paradigm, 'metadata.pkl')
+def get_metadata(paradigm, filtered=False, create_meta=False, rootdir='/n/coxfs01/behavior-data'):
+    if filtered:
+        meta_datafile = os.path.join(rootdir, paradigm, 'metadata_filtered.pkl')
+    else:
+        meta_datafile = os.path.join(rootdir, paradigm, 'metadata.pkl')
 
     reload_meta = False
-    if os.path.exists(meta_datafile):
-        print("Loading existing metadata...")
+    if os.path.exists(meta_datafile) and create_meta is False:
+        print("Loading existing metadata: %s" % meta_datafile)
         with open(meta_datafile, 'rb') as f:
             metadata = pkl.load(f)
     else:
@@ -1036,8 +1040,7 @@ def get_metadata(paradigm, rootdir='/n/coxfs01/behavior-data', create_meta=False
         all_fns = glob.glob(os.path.join(rootdir, paradigm, 'cohort_data', 'A*', 'raw', '*.mwk'))
         # --- exclude broken dfiles for now:
         excluded_dfiles = ['AK4_170907.mwk']
-        print("--- excluding:", excluded_dfiles)
- 
+        print("--- excluding:", excluded_dfiles) 
         raw_fns = [f for f in all_fns if os.path.split(f)[-1] not in excluded_dfiles]
 
         #### Get all animals and sessions
@@ -1048,19 +1051,67 @@ def get_metadata(paradigm, rootdir='/n/coxfs01/behavior-data', create_meta=False
                                           'cohort': parse_datafile_name(fn)[0][0:2]}, index=[i]) \
                                            for i, fn in enumerate(raw_fns)], axis=0)
 
-        with open(meta_datafile, 'wb') as f:
+        metadata = metadata.reset_index(drop=True)
+        tmp_metafile = os.path.join(rootdir, paradigm, 'metadata.pkl')
+        with open(tmp_metafile, 'wb') as f:
             pkl.dump(metadata, f, protocol=pkl.HIGHEST_PROTOCOL)
-            
+           
+        if filtered:
+            f_metadata = filter_metadata(metadata, paradigm, rootdir=rootdir)
+            return f_metadata
+
     return metadata
+
+
+def filter_metadata(metadata, paradigm, rootdir='/n/coxfs01/behavior-data'):
+    meta_datafile = os.path.join(rootdir, paradigm, 'metadata_filtered.pkl')
+    
+    filtered_ = []
+    for (animalid, dfn), mgroup in metadata.groupby(['animalid', 'datasource']):
+        curr_trials, curr_flags, metainfo = parse_mw_file(dfn) #, create_new=create_new)
+        if curr_trials is None or len(curr_trials)==0:
+            continue
+        filtered_.append(mgroup)
+
+    filtered_meta = pd.concat(filtered_, axis=0).reset_index(drop=True)
+    with open(meta_datafile, 'wb') as f:
+        pkl.dump(filtered_meta, f, protocol=pkl.HIGHEST_PROTOCOL)
+
+    return filtered_meta
+
+def load_session_data(animalid, paradigm, metadata, create_new=False, rootdir='/n/coxfs01/behavior-data'):
+
+    # --- Check if processed file exists -- load or create new.
+    A = Animal(animalid=animalid, experiment=paradigm, rootdir=rootdir)
+    #create_new = False
+    reload_data = False
+    if os.path.exists(A.path) and not create_new:
+        try:
+            with open(A.path, 'rb') as f:
+                tmpA = pkl.load(f)   
+        except EOFError:
+            reload_data = True
+        except ImportError:
+            reload_data = True
+    else:
+        reload_data = True
+
+    print("outfile: %s" % tmpA.path)
+    
+    # --- Process new datafiles / sessions:
+    requested_sessions = metadata[metadata.animalid==animalid]['session'].unique() #.values
+    
+    found_sessions = [s for s, sobj in tmpA.sessions.items() if s in requested_sessions]
+    for session in found_sessions:
+        A.sessions.update({session: tmpA.sessions[session]})
+
+    print("[%s] Found %i out of %i requested sessions." % (A.animalid, len(found_sessions), len(requested_sessions)))
+
+    return A
+   
 
 def load_animal_data(animalid, paradigm, metadata, create_new=False,
                      rootdir='/n/coxfs01/behavior-data'):
-
-    # --- Create or load animal datafile:
-#     cohort = str(re.findall('(\D+)', aimalid)[0])
-#     curr_processed_dir = os.path.join(root, paradigm, 'cohort_data', cohort, 'processed')
-#     animal_datafile = os.path.join(curr_processed_dir, 'data', '%s.pkl' % animalid)
-#     print("outfile: %s" % animal_datafile)
 
     # --- Check if processed file exists -- load or create new.
     A = Animal(animalid=animalid, experiment=paradigm, rootdir=rootdir)
