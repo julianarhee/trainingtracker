@@ -206,7 +206,7 @@ class Session():
                                                                outcome_types=outcome_types,
                                                                ignore_flags=ignore_flags)
            
-            if curr_meta is None:
+            if curr_meta is None or curr_trials is None or len(curr_trials)==0:
                 return None, None, -1
  
             if curr_trials is not None:
