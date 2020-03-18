@@ -255,7 +255,10 @@ def get_phase_data(cohort, paradigm='threeport', create_new=False, rootdir='/n/c
             phasedata = pkl.load(f)
     else:
         phasedata, _ = assign_phase_to_datafile(cohort, metadata, paradigm=paradigm, rootdir=rootdir)
+        with open(phase_dfile, 'wb') as f:
+            pkl.dump(phasedata, f, protocol=pkl.HIGHEST_PROTOCOL)
 
+        
     phasedata = assign_phase_to_datafile(cohort, metadata, paradigm=paradigm, rootdir=rootdir)
     
     return phasedata
