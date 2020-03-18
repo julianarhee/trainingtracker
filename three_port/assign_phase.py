@@ -99,11 +99,11 @@ def assign_phase_to_datafile(cohort, metadata, paradigm='threeport', rootdir='/n
     expected_drots = defaults['expected_depth_rotations']
     expected_size_interval = np.diff(expected_sizes).mean()
     expected_drot_interval = np.diff(expected_drots).mean()
-
     
-    animal_meta = metadata[metadata['cohort']== cohort]
-    exclude_ixs = [] # ixs of metadata if want to ignore empty trial sessions
+    exclude_ixs = []
     phasedata = []
+    animal_meta = metadata[metadata['cohort']== cohort]
+
     for (animalid, dfn), mgroup in animal_meta.sort_values(by=['animalid', 'session']).groupby(['animalid', 'datasource']):
 
         phase = -1
@@ -125,7 +125,11 @@ def assign_phase_to_datafile(cohort, metadata, paradigm='threeport', rootdir='/n
         protocol = metainfo['protocol']
         experiment_folder = metainfo['experiment']
 
-    #     if session == 20170911:
+        alpha_values = []
+        if any(['alpha_multiplier' in s.keys() for s in curr_trials]):
+            alpha_values = np.unique([s['alpha_multiplier'] for s in curr_trials])
+
+    #     if session == 20180625:
     #         break
 
         if 'morph' in protocol:
@@ -134,12 +138,8 @@ def assign_phase_to_datafile(cohort, metadata, paradigm='threeport', rootdir='/n
         elif 'newstim' in metainfo['experiment'] or any([descr in sfx for descr in new_stim_descs]):
             phase = 8
 
-        elif any(['alpha_multiplier' in s.keys() for s in S.trials]):
-            alpha_values = np.unique([s['alpha_multiplier'] for s in S.trials])
-            if len(alpha_values) > 1:
-                phase = 12
-            elif any([a!=1 for a in alpha_values]):
-                phase = 12
+        elif len(alpha_values) > 1 or any([a != 1 for a in alpha_values]):
+            phase = 12
 
         elif any(['background' in desc for desc in [sfx, metainfo['experiment']]]):
             phase = 13
@@ -237,7 +237,8 @@ def assign_phase_to_datafile(cohort, metadata, paradigm='threeport', rootdir='/n
         phasedata.append(mgroup)
 
     phasedata = pd.concat(phasedata, axis=0)
-    
+
+
     return phasedata, exclude_ixs
 
     
