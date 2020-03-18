@@ -152,9 +152,9 @@ def get_animal_df(animalid, paradigm, metadata, create_new=False, rootdir='/n/co
 
 def sessiondata_to_df(animalid, paradigm, metadata, rootdir='/n/coxfs01/behavior-data'):
    
-    A, new_sessions = util.load_animal_data(animalid, paradigm, metadata, rootdir=rootdir)
-    if len(new_sessions)> 0:
-        print("[%s] There are %i new sessions to analyze..." % (animalid, len(new_sessions)))
+    A = util.load_session_data(animalid, paradigm, metadata, rootdir=rootdir)
+
+    assert len(A.sessions)>0, "No sessions found"
 
     df = None
     sessionlist = []
@@ -175,8 +175,7 @@ def sessiondata_to_df(animalid, paradigm, metadata, rootdir='/n/coxfs01/behavior
         df = pd.concat(sessionlist, axis=0)
     print('%i sessions have no trials' % len(no_trials))
 
-
-    return df, new_sessions, no_trials
+    return df
 
 
 
