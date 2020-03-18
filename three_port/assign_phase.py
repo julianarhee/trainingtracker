@@ -250,16 +250,15 @@ def get_phase_data(cohort, paradigm='threeport', create_new=False, rootdir='/n/c
     #### Load phase info for cohort
     processed_dir = os.path.join(rootdir, paradigm, 'processed')
     phase_dfile = os.path.join(processed_dir, 'meta', 'phases_%s.pkl' % cohort)
+    print(phase_dfile)
     if os.path.exists(phase_dfile) and create_new is False:
+        print("... loading phase data...")
         with open(phase_dfile, 'rb') as f:
             phasedata = pkl.load(f)
     else:
         phasedata, _ = assign_phase_to_datafile(cohort, metadata, paradigm=paradigm, rootdir=rootdir)
         with open(phase_dfile, 'wb') as f:
             pkl.dump(phasedata, f, protocol=pkl.HIGHEST_PROTOCOL)
-
-        
-    phasedata = assign_phase_to_datafile(cohort, metadata, paradigm=paradigm, rootdir=rootdir)
     
     return phasedata
 
