@@ -64,7 +64,7 @@ def get_default_params(cohort):
     default_depth_rotation = 0.
     default_planar_rotation = 0.
 
-    if cohort in ['AK', 'AL', 'AM']:
+    if cohort in ['AK', 'AL', 'AM', 'AN', 'AO']:
         expected_sizes = np.linspace(15, 40, 11.)
         expected_drots = np.linspace(-60, 60, 25.)
         default_size = 40
@@ -132,7 +132,7 @@ def assign_phase_to_datafile(cohort, metadata, paradigm='threeport', rootdir='/n
     #     if session == 20180625:
     #         break
 
-        if 'morph' in protocol:
+        if 'morph' in protocol or any(['morph' in s['name'] for s in curr_trials]):
             phase = 7
 
         elif 'newstim' in metainfo['experiment'] or any([descr in sfx for descr in new_stim_descs]):
@@ -223,7 +223,7 @@ def assign_phase_to_datafile(cohort, metadata, paradigm='threeport', rootdir='/n
 
         else:
             print("NO CLUE.")
-            print("[%s, %s%s] unknown protocol: %s" % (animalid, session, suffix, protocol) )
+            print("[%s, %s%s] unknown protocol: %s" % (animalid, session, sfx, protocol) )
 
             print("Size", sizes)
             print("D-rots", drots)
@@ -258,6 +258,9 @@ def get_phase_data(cohort, paradigm='threeport', create_new=False, rootdir='/n/c
         phasedata, _ = assign_phase_to_datafile(cohort, metadata, paradigm=paradigm, rootdir=rootdir)
         with open(phase_dfile, 'wb') as f:
             pkl.dump(phasedata, f, protocol=pkl.HIGHEST_PROTOCOL)
+
+    print(phasedata['phase'].unique())
+    print(phasedata.groupby(['phase']).count())
     
     return phasedata
 
