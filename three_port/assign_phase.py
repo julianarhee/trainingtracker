@@ -34,7 +34,7 @@ def natural_keys(text):
     return [ atoi(c) for c in re.split('(\d+)', text) ]
 
     
-def get_default_params(cohort):
+def get_default_params(cohort, phase=None):
     # array(['', 'b', 'big', 'stimB', 'stimBlowerbound', 'stimClowerbound',
     #        'stimBupperbound', 'stimCupperbound', 'small', 'stimC', 'c',
     #        'stimCalwaysReward', 'alwaysReward', 'size', 'adeptrotl',
@@ -66,8 +66,12 @@ def get_default_params(cohort):
 
     if cohort in ['AK', 'AL', 'AM', 'AN', 'AO']:
         expected_sizes = np.linspace(15, 40, 11.)
-        expected_drots = np.linspace(-60, 60, 25.)
-        default_size = 40
+        if phase in [4, 5]:
+            expected_drots = np.linspace(-60, 60, 9.)
+            default_size = 30.
+        else:
+            expected_drots = np.linspace(-60, 60, 25.)
+            default_size = 40.
 
     elif cohort in ['AG', 'AJ']:
         expected_sizes = np.linspace(15, 40, 6.)
@@ -81,7 +85,9 @@ def get_default_params(cohort):
                 'depth_rotation': default_depth_rotation,
                 'planar_rotation':  default_planar_rotation,
                 'expected_sizes': expected_sizes,
-                'expected_depth_rotations': expected_drots}
+                'expected_depth_rotations': expected_drots,
+                'standard_depth_rotations': np.linspace(-60, 60, 9.),
+                'fine_depth_rotations': np.linspace(-60, 60, 25.)}
     
     return defaults
 
@@ -119,8 +125,8 @@ def assign_phase_to_datafile(cohort, metadata, paradigm='threeport', rootdir='/n
         drots = sorted(np.unique([t['depth_rotation'] for t in curr_trials]))
         prots = sorted(np.unique([t['rotation'] for t in curr_trials]))
 
-        tested_size_interval = np.diff(sizes).mean()
-        tested_drot_interval = np.diff(drots).mean()
+        tested_size_interval = np.median(np.diff(sizes))
+        tested_drot_interval = np.median(np.diff(drots))
 
         protocol = metainfo['protocol']
         experiment_folder = metainfo['experiment']
@@ -170,24 +176,20 @@ def assign_phase_to_datafile(cohort, metadata, paradigm='threeport', rootdir='/n
                 phase = 2
 
         # ====== PHASE 3 ====================================
-        elif len(drots) > 1 and (len(sizes)==1 and len(prots)==1):
+        elif (len(drots) > 1 and (len(sizes)==1 and len(prots)==1)):
             #if metainfo['protocol'] in ['Staircase through shape parameters', '']:
             if ( (expected_drots==drots) is False):
                 if (tested_drot_interval < expected_drot_interval):
                     # Fine-grained spacing
                     phase = 10
-                elif (tested_drot_interval==expected_drot_interval):
-                    if (len(drots) > len(expected_drots)-1):
-                        # Probably just screwed up indexing
-                        phase = 3
-                    elif all([d in expected_drots for d in drots]): 
-                        # only testing a subset of the expected values
-                        phase = 3
+                elif (tested_drot_interval==expected_drot_interval) and all([d in expected_drots for d in drots]): 
+                    # only testing a subset of the expected values
+                    phase = 3
             elif all(expected_drots==drots):
                 phase = 3
 
         # ====== PHASE 4/5 ====================================
-        elif len(drots) > 1 and len(sizes) > 1 and len(prots) == 1:
+        elif (len(drots) > 1 and len(sizes) > 1 and len(prots) == 1):
             #if metainfo['protocol'] in ['Test all transformations', '']:
             off_cross_transforms = list(set([(t['size'], t['depth_rotation']) for t in curr_trials \
                                              if t['size']!=default_size \
@@ -197,18 +199,6 @@ def assign_phase_to_datafile(cohort, metadata, paradigm='threeport', rootdir='/n
                 if (tested_size_interval < expected_size_interval) or (tested_drot_interval < expected_drot_interval):
                     # Fine-grained size/rotation transformations
                     phase = 11
-    #             elif (len(drots) == len(expected_drots)-1) or (len(sizes) == len(expected_sizes)-1):
-    #                 # Probably just screwed up indexing
-    #                 if len(off_cross_transforms) == 0:
-    #                     phase = 4 if len(off_cross_transforms) == 0 else 5
-    #             elif ((expected_drots==drots) is False):
-    #                 if all(sizes==expected_sizes):
-    #                     # Another screw up, just not changing 1 of the depth-rot sides
-    #                     phase = 4 if len(off_cross_transforms)==0 else 5
-    #             elif ((expected_sizes==sizes) is False):
-    #                 if all(drots==expected_drots):
-    #                     # Another screw up, just not changing 1 of the sizes
-    #                     phase = 4 if len(off_cross_transforms)==0 else 5       
                 elif all([d in expected_drots for d in drots]) and all([s in expected_sizes for s in sizes]):
                     phase = 4 if (len(off_cross_transforms)==0) else 5
             else:
