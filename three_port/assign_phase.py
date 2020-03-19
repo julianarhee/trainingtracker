@@ -219,7 +219,7 @@ def assign_phase_to_datafile(cohort, metadata, paradigm='threeport', rootdir='/n
             print("D-rots", drots)
             print("P-rots", prots)
 
-        print(animalid, session, phase)
+        print(animalid, '%s%s' % (session. sfx), phase)
         mgroup['phase'] = [phase for _ in np.arange(0, len(mgroup))]
         mgroup['protocol'] = [protocol for _ in np.arange(0, len(mgroup))]
         mgroup['experiment'] = [experiment_folder for _ in np.arange(0, len(mgroup))]
