@@ -59,6 +59,9 @@ def get_default_params(cohort, phase=None):
                     11: 'fine_grained_size_and_depth_rotation',
                     12: 'transparency',
                     13: 'clutter',
+                    14: 'light_position',
+                    15: 'x_rotation',
+                    16: 'position'
                     -1: 'other'}
 
     default_depth_rotation = 0.
@@ -134,6 +137,16 @@ def assign_phase_to_datafile(cohort, metadata, paradigm='threeport', rootdir='/n
         alpha_values = []
         if any(['alpha_multiplier' in s.keys() for s in curr_trials]):
             alpha_values = np.unique([s['alpha_multiplier'] for s in curr_trials])
+        
+        light_positions = []
+        if any(['light_position' in s.keys() for s in curr_trials]):
+            light_positions = list(set([s['light_position'] for s in curr_trials]))
+
+        x_rotations = []
+        if any(['x_rotations' in s.keys() for s in curr_trials]):
+            x_rotations = list(set([s['x_rotations'] for s in curr_trials]))
+
+        positions = list(set([(s['pos_x'], s['pos_y']) for s in curr_trials]))
 
     #     if session == 20180625:
     #         break
@@ -152,6 +165,16 @@ def assign_phase_to_datafile(cohort, metadata, paradigm='threeport', rootdir='/n
 
         elif 'occluded' in sfx:
             phase = 13
+            
+        elif 'rotation in x axis' in metainfo['protocol'] or len(x_rotatons)>1:
+            phase = 15
+            
+        elif len(light_positions)> 1 and all([p is not None for p in light_positions]):
+            phase = 14
+            
+        elif len(positions) > 1:
+            phase = 16
+            
 
         # ====== PHASE 1 ====================================
         elif len(sizes) == 1 and len(drots) == 1 and len(prots)==1:
@@ -210,7 +233,7 @@ def assign_phase_to_datafile(cohort, metadata, paradigm='threeport', rootdir='/n
         elif len(prots) > 1 and len(sizes)==1:
             if metainfo['protocol'] == 'Test all transformations':
                 phase = 6
-
+                
         else:
             print("NO CLUE.")
             print("[%s, %s%s] unknown protocol: %s" % (animalid, session, sfx, protocol) )
