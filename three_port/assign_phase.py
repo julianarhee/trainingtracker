@@ -61,7 +61,7 @@ def get_default_params(cohort, phase=None):
                     13: 'clutter',
                     14: 'light_position',
                     15: 'x_rotation',
-                    16: 'position'
+                    16: 'position',
                     -1: 'other'}
 
     default_depth_rotation = 0.
