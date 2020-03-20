@@ -698,16 +698,19 @@ def parse_mw_file(dfn, dst_dir=None, create_new=False,
                 drot_str = stimname.split('_')[-1]
                 depthrot_value = int(drot_str)
                 t['depth_rotation'] = depthrot_value #Blob_N2_CamRot_y-45
-            elif 'CamRot' in stimname and 'LighPos' in stimname:
-                depthrot_value = int(stimname.split('CamRot_y')[1].split('_')[0])
-                lightpos_value = tuple([int(i) for i in re.findall("[-\d]+", stimname.split('LighPos')[1])])
-                t['depth_rotation'] = depthrot_value #Blob_N2_CamRot_y-45
-                t['light_position'] = lightpos_value
-            elif 'CamRot' in stimname:
+            elif 'CamRot_y' in stimname:
                 depthrot_value = int(stimname.split('CamRot_y')[1].split('_')[0])
                 t['depth_rotation'] = depthrot_value #Blob_N2_CamRot_y-45
             elif 'morph' in stimname:
                 t['depth_rotation']=0
+
+            fname = os.path.split(t['filename'])[-1] 
+            lightpos_value = tuple([int(i) for i in re.findall("[-\d]+", fname.split('LighPos')[1])]) if 'Ligh' in fname else None
+            t['light_position'] = lightpos_value
+
+            xrot_value = int(fname.split('CamRot_x')[1].split('_')[0]) if 'CamRot_x' in fname else None
+            t['x_rotation'] = xrot_value #Blob_N2_CamRot_y-45
+
 
             # Check if no feedback
             if always_feedback:
