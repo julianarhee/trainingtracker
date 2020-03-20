@@ -95,9 +95,12 @@ def get_default_params(cohort, phase=None):
     return defaults
 
 
-def assign_phase_to_datafile(cohort, metadata, paradigm='threeport', rootdir='/n/coxfs01/behavior-data'):
+def get_phase_from_datafile(animalid, ameta, create_new=False):
 
     new_stim_descs = ['stimB', 'stimC', 'NewObjects']
+
+    phase = -1
+    (animalid, cohort, dfn, session, sfx), = ameta.values
 
     defaults = get_default_params(cohort)
     default_size = defaults['size']
@@ -108,146 +111,150 @@ def assign_phase_to_datafile(cohort, metadata, paradigm='threeport', rootdir='/n
     expected_drots = defaults['expected_depth_rotations']
     expected_size_interval = np.diff(expected_sizes).mean()
     expected_drot_interval = np.diff(expected_drots).mean()
+ 
+    curr_trials, curr_flags, metainfo = util.parse_mw_file(dfn, create_new=create_new)
+
+    if curr_trials is None or len(curr_trials)==0:
+        #exclude_ixs.extend(mgroup.index.tolist())
+        return None #continue
+
+    sizes = sorted(np.unique([t['size'] for t in curr_trials]))
+    drots = sorted(np.unique([t['depth_rotation'] for t in curr_trials]))
+    prots = sorted(np.unique([t['rotation'] for t in curr_trials]))
+
+    tested_size_interval = np.median(np.diff(sizes))
+    tested_drot_interval = np.median(np.diff(drots))
+
+    protocol = metainfo['protocol']
+    experiment_folder = metainfo['experiment']
+
+    alpha_values = []
+    if any(['alpha_multiplier' in s.keys() for s in curr_trials]):
+        alpha_values = np.unique([s['alpha_multiplier'] for s in curr_trials])
     
-    exclude_ixs = []
+    light_positions = []
+    if any(['light_position' in s.keys() for s in curr_trials]):
+        light_positions = list(set([s['light_position'] for s in curr_trials]))
+
+    x_rotations = []
+    if any(['x_rotations' in s.keys() for s in curr_trials]):
+        x_rotations = list(set([s['x_rotations'] for s in curr_trials]))
+
+    positions = list(set([(s['pos_x'], s['pos_y']) for s in curr_trials]))
+
+#     if session == 20180625:
+#         break
+
+    if 'morph' in protocol or any(['morph' in s['name'] for s in curr_trials]):
+        phase = 7
+
+    elif 'newstim' in metainfo['experiment'] or any([descr in sfx for descr in new_stim_descs]):
+        phase = 8
+
+    elif len(alpha_values) > 1 or any([a != 1 for a in alpha_values]):
+        phase = 12
+
+    elif any(['background' in desc for desc in [sfx, metainfo['experiment']]]):
+        phase = 13
+
+    elif 'occluded' in sfx:
+        phase = 13
+        
+    elif 'rotation in x axis' in metainfo['protocol'] or len(x_rotatons)>1:
+        phase = 15
+        
+    elif len(light_positions)> 1 and all([p is not None for p in light_positions]):
+        phase = 14
+        
+    elif len(positions) > 1:
+        phase = 16
+        
+
+    # ====== PHASE 1 ====================================
+    elif len(sizes) == 1 and len(drots) == 1 and len(prots)==1:
+        #if protocol in ['Initiate VIsual Pres Protocol', 'Initiate Visual Pres Protocol', '']:
+        if (sizes[0]==default_size and drots[0]==default_depth_rotation and prots[0]==default_planar_rotation):
+            phase = 1
+
+    # ====== PHASE 2 ====================================
+    elif len(sizes) > 1 and (len(drots)==1 and len(prots)==1):
+        #if metainfo['protocol'] in ['Staircase through shape parameters', '']:        
+        if ( (expected_sizes==sizes) is False):
+            if (tested_size_interval < expected_size_interval):
+                phase = 9
+            elif (tested_size_interval==expected_size_interval):
+                if (len(sizes) > len(expected_sizes)-1):
+                    # Probably just screwed up indexing
+                    phase = 2
+                elif all([d in expected_sizes for d in sizes]) : 
+                    # only testing a subset of the expected values
+                    phase = 2
+        elif all(expected_sizes==sizes):
+            phase = 2
+
+    # ====== PHASE 3 ====================================
+    elif (len(drots) > 1 and (len(sizes)==1 and len(prots)==1)):
+        #if metainfo['protocol'] in ['Staircase through shape parameters', '']:
+        if ( (expected_drots==drots) is False):
+            if (tested_drot_interval < expected_drot_interval):
+                # Fine-grained spacing
+                phase = 10
+            elif (tested_drot_interval==expected_drot_interval) and all([d in expected_drots for d in drots]): 
+                # only testing a subset of the expected values
+                phase = 3
+        elif all(expected_drots==drots):
+            phase = 3
+
+    # ====== PHASE 4/5 ====================================
+    elif (len(drots) > 1 and len(sizes) > 1 and len(prots) == 1):
+        #if metainfo['protocol'] in ['Test all transformations', '']:
+        off_cross_transforms = list(set([(t['size'], t['depth_rotation']) for t in curr_trials \
+                                         if t['size']!=default_size \
+                                         and t['depth_rotation']!=default_depth_rotation]))
+
+        if ( (expected_drots==drots) is False) or ( (expected_sizes==sizes) is False):
+            if (tested_size_interval < expected_size_interval) or (tested_drot_interval < expected_drot_interval):
+                # Fine-grained size/rotation transformations
+                phase = 11
+            elif all([d in expected_drots for d in drots]) and all([s in expected_sizes for s in sizes]):
+                phase = 4 if (len(off_cross_transforms)==0) else 5
+        else:
+            # STANDARD
+            if all(drots==expected_drots) and all(sizes==expected_sizes):
+                phase = 4 if (len(off_cross_transforms)==0) else 5
+
+    # ====== PHASE 6 (in-plane) ====================================
+    elif len(prots) > 1 and len(sizes)==1:
+        if metainfo['protocol'] == 'Test all transformations':
+            phase = 6
+            
+    else:
+        print("NO CLUE.")
+        print("[%s, %s%s] unknown protocol: %s" % (animalid, session, sfx, protocol) )
+
+        print("Size", sizes)
+        print("D-rots", drots)
+        print("P-rots", prots)
+
+    print(animalid, '%i%s' % (session, sfx), phase)
+    ameta['phase'] = [phase for _ in np.arange(0, len(ameta))]
+    ameta['protocol'] = [protocol for _ in np.arange(0, len(ameta))]
+    ameta['experiment'] = [experiment_folder for _ in np.arange(0, len(ameta))]
+
+    return ameta
+
+def assign_phase_by_cohort(cohort, metadata, paradigm='threeport', rootdir='/n/coxfs01/behavior-data'):
+
+   
+    #exclude_ixs = []
     phasedata = []
     animal_meta = metadata[metadata['cohort']== cohort]
 
-    for (animalid, dfn), mgroup in animal_meta.sort_values(by=['animalid', 'session']).groupby(['animalid', 'datasource']):
+    for (animalid, dfn), ameta in animal_meta.sort_values(by=['animalid', 'session']).groupby(['animalid', 'datasource']):
+        currmeta = get_phase_from_datafile(animalid, ameta, create_new=create_new)
 
-        phase = -1
-        (animalid, cohort, dsource, session, sfx), = mgroup.values
-
-        curr_trials, curr_flags, metainfo = util.parse_mw_file(dfn, create_new=False)
-
-        if curr_trials is None or len(curr_trials)==0:
-            exclude_ixs.extend(mgroup.index.tolist())
-            continue
-
-        sizes = sorted(np.unique([t['size'] for t in curr_trials]))
-        drots = sorted(np.unique([t['depth_rotation'] for t in curr_trials]))
-        prots = sorted(np.unique([t['rotation'] for t in curr_trials]))
-
-        tested_size_interval = np.median(np.diff(sizes))
-        tested_drot_interval = np.median(np.diff(drots))
-
-        protocol = metainfo['protocol']
-        experiment_folder = metainfo['experiment']
-
-        alpha_values = []
-        if any(['alpha_multiplier' in s.keys() for s in curr_trials]):
-            alpha_values = np.unique([s['alpha_multiplier'] for s in curr_trials])
-        
-        light_positions = []
-        if any(['light_position' in s.keys() for s in curr_trials]):
-            light_positions = list(set([s['light_position'] for s in curr_trials]))
-
-        x_rotations = []
-        if any(['x_rotations' in s.keys() for s in curr_trials]):
-            x_rotations = list(set([s['x_rotations'] for s in curr_trials]))
-
-        positions = list(set([(s['pos_x'], s['pos_y']) for s in curr_trials]))
-
-    #     if session == 20180625:
-    #         break
-
-        if 'morph' in protocol or any(['morph' in s['name'] for s in curr_trials]):
-            phase = 7
-
-        elif 'newstim' in metainfo['experiment'] or any([descr in sfx for descr in new_stim_descs]):
-            phase = 8
-
-        elif len(alpha_values) > 1 or any([a != 1 for a in alpha_values]):
-            phase = 12
-
-        elif any(['background' in desc for desc in [sfx, metainfo['experiment']]]):
-            phase = 13
-
-        elif 'occluded' in sfx:
-            phase = 13
-            
-        elif 'rotation in x axis' in metainfo['protocol'] or len(x_rotatons)>1:
-            phase = 15
-            
-        elif len(light_positions)> 1 and all([p is not None for p in light_positions]):
-            phase = 14
-            
-        elif len(positions) > 1:
-            phase = 16
-            
-
-        # ====== PHASE 1 ====================================
-        elif len(sizes) == 1 and len(drots) == 1 and len(prots)==1:
-            #if protocol in ['Initiate VIsual Pres Protocol', 'Initiate Visual Pres Protocol', '']:
-            if (sizes[0]==default_size and drots[0]==default_depth_rotation and prots[0]==default_planar_rotation):
-                phase = 1
-
-        # ====== PHASE 2 ====================================
-        elif len(sizes) > 1 and (len(drots)==1 and len(prots)==1):
-            #if metainfo['protocol'] in ['Staircase through shape parameters', '']:        
-            if ( (expected_sizes==sizes) is False):
-                if (tested_size_interval < expected_size_interval):
-                    phase = 9
-                elif (tested_size_interval==expected_size_interval):
-                    if (len(sizes) > len(expected_sizes)-1):
-                        # Probably just screwed up indexing
-                        phase = 2
-                    elif all([d in expected_sizes for d in sizes]) : 
-                        # only testing a subset of the expected values
-                        phase = 2
-            elif all(expected_sizes==sizes):
-                phase = 2
-
-        # ====== PHASE 3 ====================================
-        elif (len(drots) > 1 and (len(sizes)==1 and len(prots)==1)):
-            #if metainfo['protocol'] in ['Staircase through shape parameters', '']:
-            if ( (expected_drots==drots) is False):
-                if (tested_drot_interval < expected_drot_interval):
-                    # Fine-grained spacing
-                    phase = 10
-                elif (tested_drot_interval==expected_drot_interval) and all([d in expected_drots for d in drots]): 
-                    # only testing a subset of the expected values
-                    phase = 3
-            elif all(expected_drots==drots):
-                phase = 3
-
-        # ====== PHASE 4/5 ====================================
-        elif (len(drots) > 1 and len(sizes) > 1 and len(prots) == 1):
-            #if metainfo['protocol'] in ['Test all transformations', '']:
-            off_cross_transforms = list(set([(t['size'], t['depth_rotation']) for t in curr_trials \
-                                             if t['size']!=default_size \
-                                             and t['depth_rotation']!=default_depth_rotation]))
-
-            if ( (expected_drots==drots) is False) or ( (expected_sizes==sizes) is False):
-                if (tested_size_interval < expected_size_interval) or (tested_drot_interval < expected_drot_interval):
-                    # Fine-grained size/rotation transformations
-                    phase = 11
-                elif all([d in expected_drots for d in drots]) and all([s in expected_sizes for s in sizes]):
-                    phase = 4 if (len(off_cross_transforms)==0) else 5
-            else:
-                # STANDARD
-                if all(drots==expected_drots) and all(sizes==expected_sizes):
-                    phase = 4 if (len(off_cross_transforms)==0) else 5
-
-        # ====== PHASE 6 (in-plane) ====================================
-        elif len(prots) > 1 and len(sizes)==1:
-            if metainfo['protocol'] == 'Test all transformations':
-                phase = 6
-                
-        else:
-            print("NO CLUE.")
-            print("[%s, %s%s] unknown protocol: %s" % (animalid, session, sfx, protocol) )
-
-            print("Size", sizes)
-            print("D-rots", drots)
-            print("P-rots", prots)
-
-        print(animalid, '%i%s' % (session, sfx), phase)
-        mgroup['phase'] = [phase for _ in np.arange(0, len(mgroup))]
-        mgroup['protocol'] = [protocol for _ in np.arange(0, len(mgroup))]
-        mgroup['experiment'] = [experiment_folder for _ in np.arange(0, len(mgroup))]
-
-        phasedata.append(mgroup)
+        if currmeta is not None:
+            phasedata.append(currmeta)
 
     phasedata = pd.concat(phasedata, axis=0)
 
@@ -255,7 +262,6 @@ def assign_phase_to_datafile(cohort, metadata, paradigm='threeport', rootdir='/n
 
     
 def get_phase_data(cohort, paradigm='threeport', create_new=False, rootdir='/n/coxfs01/behavior-data'):
-
 
     metadata = util.get_metadata(paradigm, rootdir=rootdir, filtered=False, create_meta=False)
 
@@ -268,7 +274,7 @@ def get_phase_data(cohort, paradigm='threeport', create_new=False, rootdir='/n/c
         with open(phase_dfile, 'rb') as f:
             phasedata = pkl.load(f)
     else:
-        phasedata, _ = assign_phase_to_datafile(cohort, metadata, paradigm=paradigm, rootdir=rootdir)
+        phasedata, _ = assign_phase_by_cohort(cohort, metadata, paradigm=paradigm, rootdir=rootdir)
         with open(phase_dfile, 'wb') as f:
             pkl.dump(phasedata, f, protocol=pkl.HIGHEST_PROTOCOL)
 
