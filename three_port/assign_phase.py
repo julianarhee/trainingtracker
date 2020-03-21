@@ -258,7 +258,7 @@ def assign_phase_by_cohort(cohort, metadata, paradigm='threeport', create_new=Fa
 
     phasedata = pd.concat(phasedata, axis=0)
 
-    return phasedata, exclude_ixs
+    return phasedata #, exclude_ixs
 
     
 def get_phase_data(cohort, paradigm='threeport', create_new=False, rootdir='/n/coxfs01/behavior-data'):
@@ -274,7 +274,7 @@ def get_phase_data(cohort, paradigm='threeport', create_new=False, rootdir='/n/c
         with open(phase_dfile, 'rb') as f:
             phasedata = pkl.load(f)
     else:
-        phasedata, _ = assign_phase_by_cohort(cohort, metadata, paradigm=paradigm, rootdir=rootdir)
+        phasedata = assign_phase_by_cohort(cohort, metadata, paradigm=paradigm, rootdir=rootdir)
         with open(phase_dfile, 'wb') as f:
             pkl.dump(phasedata, f, protocol=pkl.HIGHEST_PROTOCOL)
 
