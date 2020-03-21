@@ -160,7 +160,7 @@ def get_phase_from_datafile(animalid, ameta, create_new=False):
     elif 'occluded' in sfx:
         phase = 13
         
-    elif 'rotation in x axis' in metainfo['protocol'] or len(x_rotatons)>1:
+    elif 'rotation in x axis' in metainfo['protocol'] or len(x_rotations)>1:
         phase = 15
         
     elif len(light_positions)> 1 and all([p is not None for p in light_positions]):
@@ -243,7 +243,7 @@ def get_phase_from_datafile(animalid, ameta, create_new=False):
 
     return ameta
 
-def assign_phase_by_cohort(cohort, metadata, paradigm='threeport', rootdir='/n/coxfs01/behavior-data'):
+def assign_phase_by_cohort(cohort, metadata, paradigm='threeport', create_new=False, rootdir='/n/coxfs01/behavior-data'):
 
    
     #exclude_ixs = []
@@ -251,7 +251,7 @@ def assign_phase_by_cohort(cohort, metadata, paradigm='threeport', rootdir='/n/c
     animal_meta = metadata[metadata['cohort']== cohort]
 
     for (animalid, dfn), ameta in animal_meta.sort_values(by=['animalid', 'session']).groupby(['animalid', 'datasource']):
-        currmeta = get_phase_from_datafile(animalid, ameta, create_new=create_new)
+        currmeta = get_phase_from_datafile(animalid, ameta) #, create_new=create_new)
 
         if currmeta is not None:
             phasedata.append(currmeta)
