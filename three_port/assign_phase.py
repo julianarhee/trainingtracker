@@ -94,6 +94,7 @@ def get_default_params(cohort, phase=None):
     
     return defaults
 
+       
 
 def get_phase_from_datafile(animalid, ameta, create_new=False):
 
@@ -243,8 +244,22 @@ def get_phase_from_datafile(animalid, ameta, create_new=False):
 
     return ameta
 
-def assign_phase_by_cohort(cohort, metadata, paradigm='threeport', create_new=False, rootdir='/n/coxfs01/behavior-data'):
 
+def assign_phase_by_animal(animalid, animal_meta, create_new=False):
+    phasedata = []
+
+    for (animalid, dfn), ameta in animal_meta.sort_values(by=['animalid', 'session']).groupby(['animalid', 'datasource']):
+        currmeta = get_phase_from_datafile(animalid, ameta) #, create_new=create_new)
+
+        if currmeta is not None:
+            phasedata.append(currmeta)
+
+    phasedata = pd.concat(phasedata, axis=0)
+
+    return phasedata #, exclude_ixs
+
+
+def assign_phase_by_cohort(cohort, metadata, paradigm='threeport', create_new=False, rootdir='/n/coxfs01/behavior-data'):
    
     #exclude_ixs = []
     phasedata = []
