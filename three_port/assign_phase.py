@@ -123,12 +123,19 @@ def get_phase_from_datafile(animalid, ameta, create_new=False):
     expected_drot_interval = np.diff(expected_drots).mean()
     
     check_alwaysreward = defaults['check_alwaysreward']
- 
+
+    curr_trials=None
+    curr_flags = None 
     curr_trials, curr_flags, metainfo = util.parse_mw_file(dfn, create_new=create_new)
 
-    if curr_trials is None or len(curr_trials)==0:
+    #print(session, len(curr_trials))
+    if metainfo==-1 or curr_trials is None or len(curr_trials)==0:
         #exclude_ixs.extend(mgroup.index.tolist())
         return None #continue
+
+    if 'N_PunishmentCycles' not in curr_flags.keys():
+        # funky dfile: AO10_180623aasize_discard.. 
+        return None
 
     sizes = sorted(np.unique([t['size'] for t in curr_trials]))
     drots = sorted(np.unique([t['depth_rotation'] for t in curr_trials]))
@@ -156,9 +163,8 @@ def get_phase_from_datafile(animalid, ameta, create_new=False):
 
 #     if session == 20180625:
 #         break
-  
-    if session in [20170725, 20170726]:
-        print(curr_flags['FlagAlwaysReward'])
+#    print(curr_flags)  
+
     if check_alwaysreward and 1 in curr_flags['FlagAlwaysReward']:
         phase = 0
        

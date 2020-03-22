@@ -669,24 +669,13 @@ def parse_mw_file(dfn, dst_dir=None, create_new=False,
                 # Check min-RT time
                 toofast_evs = sorted(df.get_events('TooFast_time'), key=lambda x: x.time)
                 tmp_flags['TooFast_time'] = int(toofast_evs[-1].value)
-
-                # CHECK TRAINING.----------------------
-#                tested_sz = np.unique([t['size'] for t in tmp_trials])
-#                if len(tested_sz) > 1 and tmp_flags['FlagStaircaseSize']!=1:
-#                    tmp_flags['FlagStairCaseSize'] = 1
-#                tested_rot = np.unique([t['depth_rotation'] for t in tmp_trials])
-#                if len(tested_rot) > 1:
-#                    if any(tested_rot<0) and not any(tmp_flags['FlagStaircaseDeptRotLeft']):
-#                        tmp_flags['FlagStaircaseDeptRotLeft'] = 1
-#                    if any(tested_rot>0) and not any(tmp_flags['FlagStaircaseDeptRotRight']):
-#                        tmp_flags['FlagStaircaseDeptRotRight'] = 1
-                # ------------------------------------------- 
-              
-                # Add current flag values to flags list:
-                flag_list.append(tmp_flags)
+ 
                 # Add boundary time to flag info:
                 tmp_flags.update({'run_bounds': bound})
 
+                # Add current flag values to flags list:
+                flag_list.append(tmp_flags)
+ 
         if len(trials) == 0:
             return trials, flags, metainfo
 
@@ -734,6 +723,7 @@ def parse_mw_file(dfn, dst_dir=None, create_new=False,
                 k: [d.get(k) for d in flag_list]
                 for k in set().union(*flag_list)
             }
+        #assert 'N_PunishmentCycles' in flags.keys(), "NO FLAG"
 
         #### Get current session server info while df open:
         server_address = df.get_events('#serialBridgeAddress')[-1].value
