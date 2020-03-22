@@ -33,19 +33,9 @@ def atoi(text):
 def natural_keys(text):
     return [ atoi(c) for c in re.split('(\d+)', text) ]
 
-    
-def get_default_params(cohort, phase=None):
-    # array(['', 'b', 'big', 'stimB', 'stimBlowerbound', 'stimClowerbound',
-    #        'stimBupperbound', 'stimCupperbound', 'small', 'stimC', 'c',
-    #        'stimCalwaysReward', 'alwaysReward', 'size', 'adeptrotl',
-    #        'bdeptrotr', 'deptrotl', 'adeptrotr', 'asize', 'bdeptrotl',
-    #        'background', 'deptrotr', 'balwaysReward', 'initial', 'deprotl',
-    #        'backgroundalwaysReward', 'bsize', 'morphs', 'aalwaysReward',
-    #        'empty', 'aasize', 'a', 'probeNewObjects', 'occluded', 'r', 'd',
-    #        'transparency', 'nominrt'], dtype=object)
 
-
-    phase_lookup = {0: 'manual',
+def print_phase_lookup():
+    phase_lookup = {0: 'always_reward',
                     1: 'default',
                     2: 'size',
                     3: 'depth_rotation',
@@ -63,6 +53,19 @@ def get_default_params(cohort, phase=None):
                     15: 'x_rotation',
                     16: 'position',
                     -1: 'other'}
+    pp.pprint(phase_lookup)
+
+    return phase_lookup
+ 
+def get_default_params(cohort, phase=None):
+    # array(['', 'b', 'big', 'stimB', 'stimBlowerbound', 'stimClowerbound',
+    #        'stimBupperbound', 'stimCupperbound', 'small', 'stimC', 'c',
+    #        'stimCalwaysReward', 'alwaysReward', 'size', 'adeptrotl',
+    #        'bdeptrotr', 'deptrotl', 'adeptrotr', 'asize', 'bdeptrotl',
+    #        'background', 'deptrotr', 'balwaysReward', 'initial', 'deprotl',
+    #        'backgroundalwaysReward', 'bsize', 'morphs', 'aalwaysReward',
+    #        'empty', 'aasize', 'a', 'probeNewObjects', 'occluded', 'r', 'd',
+    #        'transparency', 'nominrt'], dtype=object)
 
     default_depth_rotation = 0.
     default_planar_rotation = 0.
@@ -75,11 +78,13 @@ def get_default_params(cohort, phase=None):
         else:
             expected_drots = np.linspace(-60, 60, 25.)
             default_size = 40.
+        check_alwaysreward = True # Only these cohorts seem to follow AlwaysReward flag 
 
     elif cohort in ['AG', 'AJ']:
         expected_sizes = np.linspace(15, 40, 6.)
         expected_drots = np.linspace(-60, 60, 9.)
         default_size = 30
+        check_alwaysreward = False
 
     expected_size_interval = np.diff(expected_sizes).mean()
     expected_drot_interval = np.diff(expected_drots).mean()
@@ -90,7 +95,8 @@ def get_default_params(cohort, phase=None):
                 'expected_sizes': expected_sizes,
                 'expected_depth_rotations': expected_drots,
                 'standard_depth_rotations': np.linspace(-60, 60, 9.),
-                'fine_depth_rotations': np.linspace(-60, 60, 25.)}
+                'fine_depth_rotations': np.linspace(-60, 60, 25.),
+                'check_alwaysreward': check_alwaysreward}
     
     return defaults
 
@@ -112,6 +118,8 @@ def get_phase_from_datafile(animalid, ameta, create_new=False):
     expected_drots = defaults['expected_depth_rotations']
     expected_size_interval = np.diff(expected_sizes).mean()
     expected_drot_interval = np.diff(expected_drots).mean()
+    
+    check_alwaysreward = defaults['check_alwaysreward']
  
     curr_trials, curr_flags, metainfo = util.parse_mw_file(dfn, create_new=create_new)
 
@@ -145,8 +153,13 @@ def get_phase_from_datafile(animalid, ameta, create_new=False):
 
 #     if session == 20180625:
 #         break
-
-    if 'morph' in protocol or any(['morph' in s['name'] for s in curr_trials]):
+  
+    if session in [20170725, 20170726]:
+        print(curr_flags['FlagAlwaysReward'])
+    if check_alwaysreward and 1 in curr_flags['FlagAlwaysReward']:
+        phase = 0
+        
+    elif 'morph' in protocol or any(['morph' in s['name'] for s in curr_trials]):
         phase = 7
 
     elif 'newstim' in metainfo['experiment'] or any([descr in sfx for descr in new_stim_descs]):
@@ -172,14 +185,15 @@ def get_phase_from_datafile(animalid, ameta, create_new=False):
         
 
     # ====== PHASE 1 ====================================
-    elif len(sizes) == 1 and len(drots) == 1 and len(prots)==1:
-        #if protocol in ['Initiate VIsual Pres Protocol', 'Initiate Visual Pres Protocol', '']:
+    elif len(sizes) == 1 and len(drots) == 1 and len(prots)==1 \
+            and protocol in ['Initiate VIsual Pres Protocol', 'Initiate Visual Pres Protocol', '']:
         if (sizes[0]==default_size and drots[0]==default_depth_rotation and prots[0]==default_planar_rotation):
             phase = 1
 
     # ====== PHASE 2 ====================================
-    elif len(sizes) > 1 and (len(drots)==1 and len(prots)==1):
-        #if metainfo['protocol'] in ['Staircase through shape parameters', '']:        
+    elif len(sizes) > 1 and (len(drots)==1 and len(prots)==1) \
+            and protocol in ['Staircase through shape parameters', '']:    
+        
         if ( (expected_sizes==sizes) is False):
             if (tested_size_interval < expected_size_interval):
                 phase = 9
@@ -194,21 +208,24 @@ def get_phase_from_datafile(animalid, ameta, create_new=False):
             phase = 2
 
     # ====== PHASE 3 ====================================
-    elif (len(drots) > 1 and (len(sizes)==1 and len(prots)==1)):
-        #if metainfo['protocol'] in ['Staircase through shape parameters', '']:
+    elif protocol in ['Staircase through shape parameters', ''] \
+            and (1 in curr_flags['FlagStaircaseDeptRotRight'] or 1 in curr_flags['FlagStaircaseDeptRotLeft']):
         if ( (expected_drots==drots) is False):
-            if (tested_drot_interval < expected_drot_interval):
-                # Fine-grained spacing
-                phase = 10
-            elif (tested_drot_interval==expected_drot_interval) and all([d in expected_drots for d in drots]): 
-                # only testing a subset of the expected values
+            if (len(drots) > 1 and (len(sizes)==1 and len(prots)==1)): 
+                if (tested_drot_interval < expected_drot_interval):
+                    # Fine-grained spacing
+                    phase = 10
+                elif (tested_drot_interval==expected_drot_interval) and all([d in expected_drots for d in drots]): 
+                    # only testing a subset of the expected values
+                    phase = 3
+            elif len(sizes)==1 and len(drots)==1:
+                # No other rotations tested yet
                 phase = 3
         elif all(expected_drots==drots):
             phase = 3
 
     # ====== PHASE 4/5 ====================================
-    elif (len(drots) > 1 and len(sizes) > 1 and len(prots) == 1):
-        #if metainfo['protocol'] in ['Test all transformations', '']:
+    elif (len(drots) > 1 and len(sizes) > 1 and len(prots) == 1) and protocol in ['Test all transformations', '']:
         off_cross_transforms = list(set([(t['size'], t['depth_rotation']) for t in curr_trials \
                                          if t['size']!=default_size \
                                          and t['depth_rotation']!=default_depth_rotation]))
@@ -226,7 +243,7 @@ def get_phase_from_datafile(animalid, ameta, create_new=False):
 
     # ====== PHASE 6 (in-plane) ====================================
     elif len(prots) > 1 and len(sizes)==1:
-        if metainfo['protocol'] == 'Test all transformations':
+        if protocol == 'Test all transformations':
             phase = 6
             
     else:
