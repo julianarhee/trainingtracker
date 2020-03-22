@@ -668,7 +668,7 @@ def parse_mw_file(dfn, dst_dir=None, create_new=False,
 
                 # Check min-RT time
                 toofast_evs = sorted(df.get_events('TooFast_time'), key=lambda x: x.time)
-                tmp_flags['TooFast_time'] = int(toofast_evs[-1].values)
+                tmp_flags['TooFast_time'] = int(toofast_evs[-1].value)
 
                 # CHECK TRAINING.----------------------
 #                tested_sz = np.unique([t['size'] for t in tmp_trials])
