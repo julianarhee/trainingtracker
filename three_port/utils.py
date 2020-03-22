@@ -745,7 +745,8 @@ def parse_mw_file(dfn, dst_dir=None, create_new=False,
         sys_evs = df.get_events('#systemEvent')
         
         #### Get experiment name:
-        exp_evs = [v for v in sys_evs if v.value['payload_type']==experiment_load]
+        exp_evs = [v for v in sys_evs if v.value['payload_type']==experiment_load\
+                    and v.value['payload']['running']==1]
         exp_path = list(set([v.value['payload']['experiment path'] for v in exp_evs]))
         #exp_path = exp_path[0].split('/Experiment Cache/')[1]
         #re.search(r'/Experiment Cache/(.*?)/tmp', t['filename']).group(1)
