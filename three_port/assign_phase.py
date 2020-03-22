@@ -52,6 +52,9 @@ def print_phase_lookup():
                     14: 'light_position',
                     15: 'x_rotation',
                     16: 'position',
+                    17: 'punishcycle_long',
+                    18: 'punishcycle_short',
+                    19: 'no_min_RT',
                     -1: 'other'}
     pp.pprint(phase_lookup)
 
@@ -158,7 +161,16 @@ def get_phase_from_datafile(animalid, ameta, create_new=False):
         print(curr_flags['FlagAlwaysReward'])
     if check_alwaysreward and 1 in curr_flags['FlagAlwaysReward']:
         phase = 0
-        
+       
+    elif max(curr_flags['N_PunishmentCycles']) != 5:
+        if min(curr_flags['N_PunishmentCycles']) < 5:
+            phase = 18 #'punishcycle_short'
+        elif max(curr_flags['N_PunishmentCycles']) > 5:
+            phase = 17
+
+    elif 350000 not in curr_flags['TooFast_time']:
+        phase = 19
+
     elif 'morph' in protocol or any(['morph' in s['name'] for s in curr_trials]):
         phase = 7
 

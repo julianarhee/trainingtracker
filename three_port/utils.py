@@ -662,6 +662,14 @@ def parse_mw_file(dfn, dst_dir=None, create_new=False,
                         last_found_val = int(fevs[-1].value)
                         tmp_flags[flag] = None #last_found_val
 
+                # Check punishment cycle
+                punish_evs = sorted(df.get_events('N_PunishmentCycles'), key=lambda x: x.time)
+                tmp_flags['N_PunishmentCycles'] = int(punish_evs[-1].value)
+
+                # Check min-RT time
+                toofast_evs = sorted(df.get_events('TooFast_time'), key=lambda x: x.time)
+                tmp_flags['TooFast_time'] = int(toofast_evs[-1].values)
+
                 # CHECK TRAINING.----------------------
 #                tested_sz = np.unique([t['size'] for t in tmp_trials])
 #                if len(tested_sz) > 1 and tmp_flags['FlagStaircaseSize']!=1:
