@@ -311,7 +311,8 @@ def assign_phase_by_cohort(cohort, metadata, paradigm='threeport', create_new=Fa
     return phasedata #, exclude_ixs
 
     
-def get_phase_data(cohort, paradigm='threeport', create_new=False, rootdir='/n/coxfs01/behavior-data'):
+def get_phase_data(cohort, paradigm='threeport', create_new=False, verbose=False,
+        rootdir='/n/coxfs01/behavior-data'):
 
     metadata = util.get_metadata(paradigm, rootdir=rootdir, filtered=False, create_meta=False)
 
@@ -328,8 +329,9 @@ def get_phase_data(cohort, paradigm='threeport', create_new=False, rootdir='/n/c
         with open(phase_dfile, 'wb') as f:
             pkl.dump(phasedata, f, protocol=pkl.HIGHEST_PROTOCOL)
 
-    print(phasedata['phase'].unique())
-    print(phasedata.groupby(['phase']).count())
+    if verbose:
+        print(phasedata['phase'].unique())
+        print(phasedata.groupby(['phase']).count())
     
     return phasedata
 
