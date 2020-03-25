@@ -29,6 +29,77 @@ def natural_keys(text):
     return [ atoi(c) for c in re.split('(\d+)', text) ]
 
 
+
+def load_box_info(paradigm='threeport', rootdir='/n/coxfs01/behavior-data'):
+    
+    '''
+    tower X = Setup (22, 23, 24, 25), for ex., 
+        where 22 = top and 25 = bottom.
+    
+    Notes:
+        Tower 4 (w/ setup 10, oldest) is furthest from door
+        Tower 1 (w/ setup 22, newest) is closest to door
+        
+    towers = {1: (22, 23, 24,25),
+              2: (18, 19, 20, 21),
+              3: (14, 15, 16, 17),
+              4: (10, 11, 12, 13)}
+    '''
+    
+    towers = None
+    bboxes = None
+    
+    towers_fpath = os.path.join(rootdir, 'meta', 'towers.json')
+    if os.path.exists(towers_fpath):
+        print("... getting tower info")
+        with open(towers_fpath, 'r') as f:
+            towers = json.load(f)
+    
+    bboxes_fpath = os.path.join(rootdir, paradigm, 'processed', 'meta', 'behavior_boxes.json')
+    if os.path.exists(bboxes_fpath):
+        print("... getting setup box info")
+        with open(bboxes_fpath, 'r') as f:
+            bboxes = json.load(f)
+    
+    return towers, bboxes
+
+def get_box_info(metadata=None, paradigm='threeport', rootdir='/n/coxfs01/behavior-data', create_new=False):
+
+    # Get tower organization 
+    towers, bboxes = load_box_info(paradigm=paradigm, rootdir=rootdir)
+    assert towers is not None, "No towers!"
+
+    # Get BOX info for each animal
+    bboxes_fpath = os.path.join(rootdir, paradigm, 'processed', 'meta', 'behavior_boxes.json')
+    
+    # Load metadata if nec
+    if metadata is None:
+        metadata = get_metadata(paradigm, filtered=False, create_meta=False, rootdir=rootdir)
+        
+    animal_ids = metadata['animalid'].unique()
+    if bboxes is None:
+        bboxes = dict((a, []) for a in animal_ids)
+
+    add_new=False
+    for (animalid, session), session_meta in metadata.groupby(['animalid', 'session']):
+        if create_new or (animalid not in bboxes.keys() or len(bboxes[animalid])==0):
+            add_new = True
+            S = util.Session(session_meta)
+            _, _, metainfo = S.get_trials(create_new=False, verbose=False)
+            if isinstance(metainfo['server'], list):
+                for sv in metainfo['server']:
+                    if sv not in bboxes[animalid]:
+                        bboxes[animalid].append(sv)
+            else:
+                if metainfo['server'] not in bboxes[animalid]:
+                    bboxes[animalid].append(metainfo['server'])
+        if add_new:
+            with open(bboxes_fpath, 'w') as f:
+                json.dump(bboxes, f, indent=4, sort_keys=True)
+
+    return bboxes, towers
+
+
 def get_screen_info(df, run_bounds=None):
     
     if run_bounds is None:
