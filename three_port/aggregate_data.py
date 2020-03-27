@@ -121,30 +121,43 @@ def get_portmapping(df, verbose=False):
 
     portmapping = {'Object1_Port1': [], 'Object1_Port3': []}
     mixed_ = []
-    for animalid, dgroup in df[(df.objectid==1) & (df.outcome=='success')].groupby(['animalid']):
-        found_ports = dgroup['response'].value_counts().keys()
-        if len(found_ports) == 1:
-            portname = found_ports[0].split('Announce_Acquire')[-1]
-            portmapping['Object1_%s' % portname].append(animalid)
+    # for animalid, dgroup in df[(df.objectid==1) & (df.outcome=='success')].groupby(['animalid']):
+    for animalid, dgroup in df[(df.outcome=='success')].groupby(['animalid']):
+        found_ports_1 = dgroup[(dgroup.objectid==1)]['response'].value_counts().keys()
+        found_ports_2 = dgroup[(dgroup.objectid==2)]['response'].value_counts().keys()
+        # found_ports = dgroup['response'].value_counts().keys()
+        if len(found_ports_1)==1 and len(found_ports_2)==1:
+            portname_1 = found_ports_1[0].split('Announce_Acquire')[-1]
+            portmapping['Object1_%s' % portname_1].append(animalid)
+            #portname_2 = found_ports_2[0].split('Announce_Acquire')[-1]
+            #portmapping['Object2_%s' % portname_2].append(animalid)
         else:
             mixed_.append(animalid)
 
     #### For sessionids w/ multiple port-mappings, likely an error and should be filtered out
     bad_portmapping = dict((animalid, []) for animalid in mixed_)
     for animalid in mixed_:
-        object1_port1 = df[(df.animalid==animalid) & (df.objectid==1) 
-                & (df.outcome=='success') & (df.response=='Announce_AcquirePort1')]['sessionid'].unique()
-        object1_port3 = df[(df.animalid==animalid) & (df.objectid==1) 
-                & (df.outcome=='success') & (df.response=='Announce_AcquirePort3')]['sessionid'].unique()
+        object1_port1 = df[(df.animalid==animalid) & (df.outcome=='success') 
+                            & (df.objectid==1) & (df.response=='Announce_AcquirePort1')]['sessionid'].unique()
+        object1_port3 = df[(df.animalid==animalid) & (df.outcome=='success')
+                            & (df.objectid==1) & (df.response=='Announce_AcquirePort3')]['sessionid'].unique()
+        object2_port1 = df[(df.animalid==animalid) & (df.outcome=='success') 
+                            & (df.objectid==2) & (df.response=='Announce_AcquirePort1')]['sessionid'].unique()
+        object2_port3 = df[(df.animalid==animalid) & (df.outcome=='success') 
+                            & (df.objectid==2) & (df.response=='Announce_AcquirePort3')]['sessionid'].unique()
 
-        if len(object1_port1) > len(object1_port3):
+
+        if (len(object1_port1) > len(object1_port3)) and (len(object2_port3) > len(object2_port1)):
             # This is a Port1 mapper, with mistaken Port3 mapping
+            # Object1 = Port1, Object2 = Port3
             portmapping['Object1_Port1'].append(animalid)
-            bad_portmapping[animalid] = object1_port3
-        elif len(object1_port3) > len(object1_port1):
+            bad_portmapping[animalid] = list(object1_port3)
+            bad_portmapping[animalid].extend(object2_port1)
+        elif (len(object1_port3) > len(object1_port1)) and (len(object2_port1) > len(object2_port3)):
+            # Object1 = Port3, Object2 = Port1
             portmapping['Object1_Port3'].append(animalid)
-            bad_portmapping[animalid] = object1_port1
-
+            bad_portmapping[animalid] = list(object1_port1)
+            bad_portmapping[animalid].extend(object2_port3)
         else:
             print(animalid, "[WARNING] %s -- funky mapping..." % animalid)
     if verbose:

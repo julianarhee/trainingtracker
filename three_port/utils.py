@@ -79,13 +79,19 @@ def get_box_info(metadata=None, paradigm='threeport', rootdir='/n/coxfs01/behavi
     animal_ids = metadata['animalid'].unique()
     if bboxes is None:
         bboxes = dict((a, []) for a in animal_ids)
+    else:
+        for animalid in animal_ids:
+            if animalid not in bboxes.keys():
+                bboxes[animalid] = []
 
     add_new=False
     for (animalid, session), session_meta in metadata.groupby(['animalid', 'session']):
         if create_new or (animalid not in bboxes.keys() or len(bboxes[animalid])==0):
             add_new = True
-            S = util.Session(session_meta)
+            S = Session(session_meta)
             _, _, metainfo = S.get_trials(create_new=False, verbose=False)
+            if metainfo==-1:
+                continue
             if isinstance(metainfo['server'], list):
                 for sv in metainfo['server']:
                     if sv not in bboxes[animalid]:
