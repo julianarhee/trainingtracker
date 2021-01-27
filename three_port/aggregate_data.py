@@ -96,7 +96,7 @@ def get_cohort_data_by_phase(cohortdf, phase_list=[], cohort_list=None):
             if len(dlist) > 0:
                 tmpdf = pd.concat(dlist, axis=0).reset_index(drop=True)
                 tmpdf['cohort'] = [cohort for _ in np.arange(0, len(tmpdf))]
-                tmpdf['objectid'] = [int(i) for i in tmpdf['object']]
+                tmpdf['objectid'] = [str(i) for i in tmpdf['object']]
                 tmpdf['phase'] = [curr_phase for _ in np.arange(0, len(tmpdf))]
                 df_.append(tmpdf)
 
@@ -105,7 +105,7 @@ def get_cohort_data_by_phase(cohortdf, phase_list=[], cohort_list=None):
     return df
 
 
-def get_portmapping(df, verbose=False):
+def get_portmapping(tmpdf, verbose=False):
     # object1_port3 = df[ (df['object']==1) & (df['outcome']=='success') 
     #                    & (df['response']=='Announce_AcquirePort3')  ]['animalid'].unique()
     # object1_port1 = df[ (df['object']==1) & (df['outcome']=='success') 
@@ -118,6 +118,8 @@ def get_portmapping(df, verbose=False):
     # object2_port1 = df[ (df['object']==2) & (df['outcome']=='success') 
     #                    & (df['response']=='Announce_AcquirePort1')  ]['animalid'].unique()
     # assert all(object1_port3 == object2_port1), "Mismatch for Object1-Port3 / Object2-Port1 mapping"
+    df = tmpdf[tmpdf['object']!='morph'].copy()
+    df['objectid'] = df['objectid'].astype(int)
 
     portmapping = {'Object1_Port1': [], 'Object1_Port3': []}
     mixed_ = []

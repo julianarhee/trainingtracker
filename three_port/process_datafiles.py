@@ -1,7 +1,7 @@
 #!/usr/bin/env python2
 
 import matplotlib as mpl
-mpl.use('agg')
+#mpl.use('agg')
 import os
 import glob
 import json
@@ -178,6 +178,54 @@ def sessiondata_to_df(animalid, paradigm, metadata, rootdir='/n/coxfs01/behavior
     return df
 
 
+# --------------------------------------------------------------------
+# Aggregate
+# --------------------------------------------------------------------
+def combine_cohorts_to_dataframe(metadata, paradigm='threeport', cohorts=[], excluded_animals=[]):
+    
+    if len(cohorts) == 0:
+        cohorts = sorted(metadata['cohort'].unique(), key=natural_keys)
+    print("combining data from %i cohorts:" % len(cohorts), cohorts)
+    
+    dflist = []
+    for (cohort, animalid), animal_meta in metadata.groupby(['cohort', 'animalid']):
+        if animalid in excluded_animals:
+            print("... skipping %i" % animalid)
+            continue
+            
+        if cohort not in cohorts:
+            continue
+            
+        a_df, _ = get_animal_df(animalid, paradigm, metadata, create_new=False)
+        
+        if a_df is None:
+            print("... no DF found: %s" % animalid)
+            continue
+        a_df = a_df.reset_index(drop=True)
+
+        #included_sessions = check_against_manual_sorting(animalid, phase)
+        #currdf = a_df[a_df['session'].isin(included_sessions)].copy()
+    
+        #### Update some sorting values
+        a_df['animalid'] = [animalid for _ in np.arange(0, len(a_df))]
+        a_df['cohort'] = [cohort for _ in np.arange(0, len(a_df))]
+        a_df['sessionid'] = ['%s%s' % (sess, sfx) for sess, sfx in zip(a_df['session'], a_df['suffix'])]
+        
+        dflist.append(a_df)
+        
+    df = pd.concat(dflist, axis=0).reset_index(drop=True)
+
+    ignore_vars = ['Flag', 'action', 'alpha_multiplier', 'size_x', 'size_y']
+    ignore_cols = [f for f in df.columns if any([desc in f for desc in ignore_vars])]
+    keep_cols = [f for f in df.columns if f not in ignore_cols]
+    df = df[keep_cols]
+
+    return df
+
+
+
+
+# --------------------------------------------------------------------
 
 def extract_options(options):
     parser = optparse.OptionParser()

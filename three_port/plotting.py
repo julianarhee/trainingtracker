@@ -138,3 +138,81 @@ def format_size_depth_ticks(ax, xvals=[], yvals=[],
         ax.set_yticklabels(yvals)
     
     return ax
+
+def set_split_xlabels(ax, n_bars=3, offset=0.25, a_label='rfs', b_label='rfs10', rotation=0, ha='center'):
+    xticks = []
+    xticklabels=[]
+    for b in np.arange(n_bars):
+        xticks.extend([b-offset, b+offset])
+        xticklabels.extend([a_label, b_label])
+
+    #ax.set_xticks([0-offset, 0+offset, 1-offset, 1+offset, 2-offset, 2+offset])
+    #ax.set_xticklabels([a_label, b_label, a_label, b_label, a_label, b_label], rotation=rotation, ha=ha
+    ax.set_xticks(xticks)
+    ax.set_xticklabels(xticklabels)
+    ax.set_xlabel('')
+    ax.tick_params(axis='x', size=0)
+    sns.despine(bottom=True, offset=4)
+    return ax
+
+def pairwise_compare_metric(comdf, curr_metric='accuracy', sorter='animalid',
+                            c1=1, c2=2, compare_var='objectid',
+                            column_var=None, column_colors=None,
+                            ax=None, marker='o', col_colors=None, dpi=150):
+    assert sorter in comdf.columns, "Need a sorter, <%s> not found." % sorter
+
+    if column_var is None: 
+        column_var='placeholder'
+        comdf['placeholder'] = 'placeholder'
+        column_vals = ['placeholder']
+
+    column_vals = comdf[column_var].unique()
+
+    if column_colors is None:
+        colors = sns.color_palette(palette='colorblind', n_colors=len(column_vals))
+        column_colors = dict((k, v) for k, v in zip(column_vals, colors))
+
+    offset = 0.25
+    
+    if ax is None:
+        fig, ax = pl.subplots(figsize=(5,4), dpi=dpi)
+        fig.patch.set_alpha(0)
+        ax.patch.set_alpha(0)
+    
+    # Plot paired values
+    aix=0
+    for ai, (column_val, plotdf) in enumerate(comdf.groupby([column_var])):
+
+        a_vals = plotdf[plotdf[compare_var]==c1].sort_values(by=sorter)[curr_metric].values
+        b_vals = plotdf[plotdf[compare_var]==c2].sort_values(by=sorter)[curr_metric].values
+
+        by_exp = [(a, e) for a, e in zip(a_vals, b_vals)]
+        for pi, p in enumerate(by_exp):
+            ax.plot([aix-offset, aix+offset], p, marker=marker, 
+                    color=column_colors[column_val], 
+                    alpha=1, lw=0.5,  zorder=0, markerfacecolor=None, 
+                    markeredgecolor=column_colors[column_val])
+        tstat, pval = spstats.ttest_rel(a_vals, b_vals)
+        print("%s: (t-stat:%.2f, p=%.2f)" % (column_val, tstat, pval))
+        aix = aix+1
+
+    # Plot average
+    sns.barplot(column_var, curr_metric, data=comdf, 
+                hue=compare_var, hue_order=[c1, c2], #zorder=0,
+                ax=ax, order=column_vals,
+                errcolor="k", edgecolor='k', 
+                facecolor='none', linewidth=2.5)
+    ax.legend_.remove()
+
+    set_split_xlabels(ax, n_bars=len(column_vals), a_label=c1, b_label=c2)
+    
+    return ax
+
+
+def annotateBars(row, ax, fontsize=12, fmt='%.2f', fontcolor='k', xytext=(0, 10)): 
+    for p in ax.patches:
+        ax.annotate(fmt % p.get_height(), (p.get_x() + p.get_width() / 2., 0.), #p.get_height()),
+                    ha='center', va='center', fontsize=fontsize, color=fontcolor, 
+                    rotation=0, xytext=xytext, #(0, 10),
+             textcoords='offset points')
+ 
