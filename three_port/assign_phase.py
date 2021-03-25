@@ -3,9 +3,9 @@
 import os
 import glob
 import json
-import pymworks
+#import pymworks
 import re
-import datautils
+#import datautils
 import copy
 import math
 import time
@@ -17,12 +17,16 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import pylab as pl
-import cPickle as pkl
-from cPickle import PicklingError
+#import cPickle as pkl
+try:
+    import cPickle as pkl
+except:
+    import pickle as pkl
+#from cPickle import PicklingError
 
 import scipy.stats as spstats
 import utils as util
-import process_datafiles as processd
+#import process_datafiles as processd
 
 import pprint
 
@@ -313,7 +317,7 @@ def assign_phase_by_cohort(cohort, metadata, paradigm='threeport', create_new=Fa
     
 def get_phase_data(cohort, paradigm='threeport', create_new=False, verbose=False,
         rootdir='/n/coxfs01/behavior-data'):
-
+    import cPickle as pkl
     metadata = util.get_metadata(paradigm, rootdir=rootdir, filtered=False, create_meta=False)
 
     #### Load phase info for cohort

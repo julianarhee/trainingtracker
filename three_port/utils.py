@@ -5,9 +5,9 @@ mpl.use('agg')
 import os
 import glob
 import json
-import pymworks
+#import pymworks
 import re
-import datautils
+#import datautils
 import copy
 import math
 import time
@@ -17,8 +17,12 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import pylab as pl
-import cPickle as pkl
-from cPickle import PicklingError
+#import cPickle as pkl
+try:
+    import cPickle as pkl
+except:
+    import pickle as pkl
+#from cPickle import PicklingError
 
 import scipy.stats as spstats
 
@@ -112,7 +116,7 @@ def get_screen_info(df, run_bounds=None):
         run_bounds = get_run_time(df)
         assert len(run_bounds) > 0, "ABORT. No run times found: %s" % df.filename
        
-    print run_bounds 
+    print(run_bounds)
     if isinstance(run_bounds, list) and len(run_bounds)==1:
         run_mode_times = run_bounds[0]
     elif isinstance(run_bounds, list) and len(run_bounds) > 1:
@@ -353,6 +357,7 @@ class Session():
 
     def get_counts_by_stimulus(self):
         print("... Getting stimulus counts ...")
+        import datautils
         counts = None
         if self.trials is not None:
             
@@ -585,7 +590,7 @@ def parse_mw_file(dfn, dst_dir=None, create_new=False,
                  response_types=['Announce_AcquirePort1', 'Announce_AcquirePort3', 'ignore'], \
                  outcome_types = ['success', 'ignore', 'failure'],\
                  ignore_flags=[], remove_orphans=True):
-   
+    import pymworks 
     trials = []
     metainfo = {}
     flags = {}
@@ -614,7 +619,7 @@ def parse_mw_file(dfn, dst_dir=None, create_new=False,
         do_parsing = True
             
     if do_parsing:
-        print "***** Parsing trials *****"
+        print("***** Parsing trials *****")
         print("-- saving tmp outfile to: %s" % (dst_outfile))
         df = None
         try:
@@ -673,8 +678,8 @@ def parse_mw_file(dfn, dst_dir=None, create_new=False,
 
             # **sync outcome events to response events as master (direction 1=slave after master, -1=slave before master)
             outcomes = pymworks.events.utils.sync(outcome_evs, responses, direction=1, mkey=lambda x: x['response_time'])
-            print "N total response events: ", len(responses)
-            print "N total outcome events: ", len(outcomes)
+            print("N total response events: %i" % len(responses))
+            print("N total outcome events: %i" % len(outcomes))
 
             assert len(responses) == len(outcomes), "**ERROR:  N responses (%i) != N outcomes (%i)" % (len(responses), len(outcomes))
             tmp_trials = copy.copy(responses)
@@ -691,8 +696,8 @@ def parse_mw_file(dfn, dst_dir=None, create_new=False,
                 tmp_trials = [t for t in tmp_trials if not t['outcome']=='unknown']
                 tmp_trials = [t for t in tmp_trials if not t['%s' % outcome_key]=='unknown']
 
-                print "Found and removed %i orphan stimulus events in file %s" % (len(orphans), df.filename)
-                print "N valid trials: %i" % len(tmp_trials)
+                print("Found and removed %i orphan stimulus events in file %s" % (len(orphans), df.filename))
+                print("N valid trials: %i" % len(tmp_trials))
 
             # Add current trials in chunk to trials list:
             trials.extend(tmp_trials)
@@ -913,6 +918,7 @@ def to_trials(stim_display_events, outcome_events, outcome_key='outcome',
         if  0, slave and master events occur simultaneously
 
     """
+    import pymworks
     if (len(outcome_events) == 0) or (len(stim_display_events) == 0):
         return []
     assert hasattr(outcome_events[0], 'name')

@@ -5,9 +5,9 @@ import matplotlib as mpl
 import os
 import glob
 import json
-import pymworks
+#import pymworks
 import re
-import datautils
+#import datautils
 import copy
 import math
 import time
@@ -51,7 +51,7 @@ def get_session(animalid, session, metadata, n_processes=1,
     end_t = time.time() - start_t
     print("--> Elapsed time: {0:.2f}sec".format(end_t))
 
-    print S.flags
+    print(S.flags)
 
     return S
 
