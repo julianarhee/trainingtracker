@@ -1115,7 +1115,7 @@ def get_metadata(paradigm, filtered=False, create_meta=False, rootdir='/n/coxfs0
     if os.path.exists(meta_datafile) and create_meta is False:
         print("Loading existing metadata: %s" % meta_datafile)
         with open(meta_datafile, 'rb') as f:
-            metadata = pkl.load(f)
+            metadata = pkl.load(f, encoding='latin1')
     else:
         reload_meta = True
 

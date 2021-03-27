@@ -317,7 +317,6 @@ def assign_phase_by_cohort(cohort, metadata, paradigm='threeport', create_new=Fa
     
 def get_phase_data(cohort, paradigm='threeport', create_new=False, verbose=False,
         rootdir='/n/coxfs01/behavior-data'):
-    import cPickle as pkl
     metadata = util.get_metadata(paradigm, rootdir=rootdir, filtered=False, create_meta=False)
 
     #### Load phase info for cohort
@@ -327,7 +326,7 @@ def get_phase_data(cohort, paradigm='threeport', create_new=False, verbose=False
         print("... loading phase data...")
         print(phase_dfile)
         with open(phase_dfile, 'rb') as f:
-            phasedata = pkl.load(f)
+            phasedata = pkl.load(f, encoding='latin1')
     else:
         phasedata = assign_phase_by_cohort(cohort, metadata, paradigm=paradigm, rootdir=rootdir)
         with open(phase_dfile, 'wb') as f:

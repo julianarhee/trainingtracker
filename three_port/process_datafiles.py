@@ -19,8 +19,14 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import pylab as pl
-import cPickle as pkl
-from cPickle import PicklingError
+#import cPickle as pkl
+#from cPickle import PicklingError
+try:
+    import cPickle as pkl
+except:
+    import pickle as pkl
+#from cPickle import PicklingError
+
 
 from scipy import stats
 #import parse_behavior as pb
@@ -100,7 +106,7 @@ def get_sessions_for_animal(animalid, metadata, n_processes=1, plot_each_session
     try:
         with open(A.path, 'wb') as f:
             pkl.dump(A, f, protocol=pkl.HIGHEST_PROTOCOL)
-    except PicklingError:
+    except Exception as e: #PicklingError:
         print("Unable to pkl: New sessions are not the same class as old sessions.")
         print("Reprocessing %i old sessions..." % len(processed_sessions))
         for session in old_sessions:
@@ -132,7 +138,7 @@ def get_animal_df(animalid, paradigm, metadata, create_new=False, rootdir='/n/co
     if os.path.exists(d_outfile) and create_new is False:
         print("... loading existing df")
         with open(d_outfile, 'rb') as f:
-            df = pkl.load(f)
+            df = pkl.load(f, encoding='latin1')
     else:
         reload_df = True
 
