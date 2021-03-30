@@ -3,9 +3,9 @@
 import os
 import glob
 import json
-import pymworks
+#import pymworks
 import re
-import datautils
+#import datautils
 import copy
 import math
 import time
@@ -17,8 +17,8 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import pylab as pl
-import cPickle as pkl
-from cPickle import PicklingError
+#import cPickle as pkl
+#from cPickle import PicklingError
 import scipy.stats as spstats
 
 import utils as util
@@ -179,7 +179,11 @@ def get_portmapping(tmpdf, verbose=False):
                          & (df.outcome=='success') & (df.response!='ignore')]['response'].unique()
         assert len(found_ports)==1 and 'Object2_%s' % found_ports[0].split('Announce_Acquire')[-1]==other_pmap, "[%s] %s" % (animalid, str(found_ports))
 
-    assert len(np.intersect1d(portmapping.values()[0], portmapping.values()[1]))==0, "[ERROR]: bad portmapping, got non-unique lists for each map. DEBUG."
+    #assert len(np.intersect1d(portmapping.values()[0], portmapping.values()[1]))==0, "[ERROR]: bad portmapping, got non-unique lists for each map. DEBUG."
+
+    assert len(np.intersect1d(portmapping['Object1_Port1'], portmapping['Object1_Port3']))==0, \
+            "[ERROR]: bad portmapping, got non-unique lists for each map. DEBUG."
+
 
     return portmapping
 

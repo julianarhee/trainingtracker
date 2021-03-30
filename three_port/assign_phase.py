@@ -78,18 +78,18 @@ def get_default_params(cohort, phase=None):
     default_planar_rotation = 0.
 
     if cohort in ['AK', 'AL', 'AM', 'AN', 'AO']:
-        expected_sizes = np.linspace(15, 40, 11.)
+        expected_sizes = np.linspace(15., 40., 11)
         if phase in [4, 5]:
-            expected_drots = np.linspace(-60, 60, 9.)
+            expected_drots = np.linspace(-60., 60., 9)
             default_size = 30.
         else:
-            expected_drots = np.linspace(-60, 60, 25.)
+            expected_drots = np.linspace(-60., 60., 25)
             default_size = 40.
         check_alwaysreward = True # Only these cohorts seem to follow AlwaysReward flag 
 
     elif cohort in ['AG', 'AJ']:
-        expected_sizes = np.linspace(15, 40, 6.)
-        expected_drots = np.linspace(-60, 60, 9.)
+        expected_sizes = np.linspace(15., 40., 6)
+        expected_drots = np.linspace(-60., 60., 9)
         default_size = 30
         check_alwaysreward = False
 
@@ -101,8 +101,8 @@ def get_default_params(cohort, phase=None):
                 'planar_rotation':  default_planar_rotation,
                 'expected_sizes': expected_sizes,
                 'expected_depth_rotations': expected_drots,
-                'standard_depth_rotations': np.linspace(-60, 60, 9.),
-                'fine_depth_rotations': np.linspace(-60, 60, 25.),
+                'standard_depth_rotations': np.linspace(-60., 60., 9),
+                'fine_depth_rotations': np.linspace(-60., 60., 25),
                 'check_alwaysreward': check_alwaysreward}
     
     return defaults

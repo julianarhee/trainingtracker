@@ -3,9 +3,9 @@
 import os
 import glob
 import json
-import pymworks
+#import pymworks
 import re
-import datautils
+#import datautils
 import copy
 import math
 import time
@@ -18,7 +18,7 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import pylab as pl
-import cPickle as pkl
+#import cPickle as pkl
 import scipy.stats as spstats
 
 import utils as util
@@ -29,6 +29,54 @@ pp = pprint.PrettyPrinter(indent=4)
 
 import matplotlib.patches as mpatches
 import matplotlib.colors as mcolors
+
+# -----------------------------------------------------------------------------
+
+# Plotting:
+# -----------------------------------------------------------------------------
+def label_figure(fig, data_identifier):
+    fig.text(0, 1,data_identifier, ha='left', va='top', fontsize=8)
+
+def set_plot_params(lw_axes=0.25, labelsize=6, color='k', dpi=100):
+    import pylab as pl
+    #### Plot params
+    #pl.rcParams['font.size'] = 6
+    #pl.rcParams['text.usetex'] = True
+    
+    pl.rcParams["axes.labelsize"] = labelsize + 2
+    pl.rcParams["axes.linewidth"] = lw_axes
+    pl.rcParams["xtick.labelsize"] = labelsize
+    pl.rcParams["ytick.labelsize"] = labelsize
+    pl.rcParams['xtick.major.width'] = lw_axes
+    pl.rcParams['xtick.minor.width'] = lw_axes
+    pl.rcParams['ytick.major.width'] = lw_axes
+    pl.rcParams['ytick.minor.width'] = lw_axes
+    pl.rcParams['legend.fontsize'] = labelsize
+    
+    pl.rcParams['figure.figsize'] = (5, 4)
+    pl.rcParams['figure.dpi'] = dpi
+    pl.rcParams['savefig.dpi'] = dpi
+    pl.rcParams['svg.fonttype'] = 'none' #: path
+        
+    
+    for param in ['xtick.color', 'ytick.color', 'axes.labelcolor', 'axes.edgecolor']:
+        pl.rcParams[param] = color
+
+    return 
+
+
+def get_fig_id(animalids, cohort_list, phase_list):
+    cohort_str = []
+    for cohort in cohort_list:
+        anums = [int(re.search(r'(\d+)', a).group()) for a in animalids \
+                 if re.search(r'(\D+)', a).group()==cohort]
+        if len(anums)>0:
+            cohort_str.append('%s%i-%i' % (cohort, min(anums), max(anums)))
+        else:
+            print("Skipping <%s>, none found" % cohort)
+    figid = 'phase%s_cohorts_%s\n%s' % ('-'.join([str(p) for p in phase_list]), '-'.join(cohort_list), ' | '.join(cohort_str))
+
+    return figid
 
 
 def update_fonts(labelsize=24): #big=True):
@@ -74,7 +122,14 @@ def outline_boxplot(ax):
     return
 
 
+from matplotlib.lines import Line2D
 from matplotlib.patches import Rectangle
+
+def legend_from_dict(legend_dict, marker='o', markersize=5):
+
+    leg_handles = [Line2D([0], [0], marker='o', color=c, label=l,
+                        markerfacecolor=c, markersize=markersize) for l, c in legend_dict.items()]
+    return leg_handles
 
 def draw_no_feedback(ax, curr_no_fb, defaults, seaborn=True, lw=2):
 

@@ -650,7 +650,9 @@ def parse_mw_file(dfn, dst_dir=None, create_new=False,
                                                'nofeedback_size_max',
                                                'nofeedback_depth_rotation_min',
                                                'nofeedback_depth_rotation_max'])
-                fb_info = list(set([(e.name, e.value) for e in no_fb_params_tmp]))
+                no_fb_params_evs = [i for i in no_fb_params_tmp if bound[0] <= i['time']<= bound[1]] 
+
+                fb_info = list(set([(e.name, e.value) for e in no_fb_params_evs]))
                 no_fb = {}
                 for fb in fb_info:
                     param = '_'.join(fb[0].split('_')[1:-1])
@@ -1114,8 +1116,12 @@ def get_metadata(paradigm, filtered=False, create_meta=False, rootdir='/n/coxfs0
     reload_meta = False
     if os.path.exists(meta_datafile) and create_meta is False:
         print("Loading existing metadata: %s" % meta_datafile)
-        with open(meta_datafile, 'rb') as f:
-            metadata = pkl.load(f, encoding='latin1')
+        try:
+            with open(meta_datafile, 'rb') as f:
+                metadata = pkl.load(f)
+        except Exception as e:
+            with open(meta_datafile, 'rb') as f:
+                metadata = pkl.load(f, encoding='latin1')
     else:
         reload_meta = True
 
