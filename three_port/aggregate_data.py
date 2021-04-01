@@ -264,3 +264,88 @@ def check_multi_box(bboxes, paradigm='threeport', rootdir='/n/coxfs01/behavior-d
 
 
     return multi_box
+
+
+
+# Aggregating + adding info to dataframes
+# ============================================================
+def add_portmap(df_):
+    portmapping = get_portmapping(df_)
+
+    df_['portmap'] = None #[0 for _ in np.arange(0, len(df_))]
+    df_.loc[df_['animalid'].isin(portmapping['Object1_Port1']), 'portmap'] = 1
+    df_.loc[df_['animalid'].isin(portmapping['Object1_Port3']), 'portmap'] = 0
+
+    return portmapping, df_
+def add_train_day(df_):
+    '''
+    For each phase, get Nth day in that phase
+    '''
+    df_['train_day'] = -1
+    for (animalid, curr_phase), g in df_.groupby(['animalid', 'phase']):
+        sorted_sessions = list(sorted(g['sessionid'].unique(), key=util.natural_keys))
+        sorted_session_ixs = [sorted_sessions.index(s) for s in g['sessionid']]
+        df_.loc[g.index, 'train_day'] = sorted_session_ixs
+    return df_
+
+
+def get_counts_from_session_df(df_, group_all_conds=False):
+    '''
+    From aggregated session df, count all the trials per session for summary stats (e.g,. accuracy)
+    '''
+    #group_cols = ['cohort','animalid', 'session', 'phase']
+    group_cols = ['cohort', 'animalid', 'session', 'phase', 'objectid']
+    if group_all_conds:
+        group_cols.extend(['size', 'depth_rotation', 'portmap'])
+
+    counts = df_.groupby(group_cols)['outcome']\
+                          .value_counts().unstack().reset_index()
+    if 'ignore' in counts:
+        counts['n_total'] = counts['failure']+counts['success'] + counts['ignore']
+    else:
+        counts['n_total'] = counts['failure']+counts['success']
+    #counts['n_total'] = counts['failure'] + counts['success']
+    counts['accuracy'] = counts['success'] / counts['n_total']
+    counts['accuracy'] = counts['accuracy'].astype(float)
+    
+    return counts
+
+
+def animals_pass_criterion(standard_df, criterion=0.7, defaults_only=False,
+                            fullcross=True, group_all_conds=False, min_train_phase=1,
+                            frac_max=0.75):
+    max_train_phase = 4 if fullcross else 1
+
+    if defaults_only:
+
+        phase1_df = standard_df[ (standard_df['object']!='morph') 
+                           & (standard_df['phase']<=max_train_phase) 
+                           & (standard_df['size'].isin([30, 40])) 
+                           & (standard_df['depth_rotation']==0)]#\
+        #            .groupby(['animalid', 'phase', 'session'])['outcome']\
+        #            .value_counts().unstack().reset_index()
+        #phase1_df['n_trials'] = phase1_df['failure']+phase1_df['success']
+        #phase1_df['accuracy'] = phase1_df['success']/phase1_df['n_trials']
+    else:
+        
+        phase1_df0 = pd.concat([g[g['train_day']>=g['train_day'].max()*frac_max] if ph==1 else g \
+                                for ph, g in standard_df.groupby(['phase'])])
+
+        phase1_df = phase1_df0[(phase1_df0['phase']<=max_train_phase)
+                        & (phase1_df0['phase']>=min_train_phase)].copy()
+
+    phase1_counts = get_counts_from_session_df(phase1_df, 
+                        group_all_conds=group_all_conds)
+
+    animalids = phase1_counts['animalid'].unique()
+    mean_acc = phase1_counts.groupby(['animalid']).mean().reset_index()
+
+    pass_animals = mean_acc[mean_acc['accuracy']>=criterion]['animalid'].unique()
+    
+    missing = [k for k in animalids if k not in pass_animals]
+
+    print("%i of %i animals pass min crit. %.2f accuracy on training. Fail animals %i:\n  " \
+          % (len(pass_animals), len(animalids), criterion, len(missing)), missing)
+
+    return pass_animals, missing
+
