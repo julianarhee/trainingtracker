@@ -237,9 +237,16 @@ def pairwise_compare_metric(comdf, curr_metric='accuracy', sorter='animalid',
     # Plot paired values
     aix=0
     for ai, (column_val, plotdf) in enumerate(comdf.groupby([column_var])):
-
-        a_vals = plotdf[plotdf[compare_var]==c1].sort_values(by=sorter)[curr_metric].values
-        b_vals = plotdf[plotdf[compare_var]==c2].sort_values(by=sorter)[curr_metric].values
+        a_df = plotdf[plotdf[compare_var]==c1].sort_values(by=sorter)
+        b_df = plotdf[plotdf[compare_var]==c2].sort_values(by=sorter)
+        a_=a_df[sorter].unique()
+        b_ = b_df[sorter].unique()
+        both_ = np.intersect1d(a_, b_)
+        
+        a_vals = a_df[a_df[sorter].isin(both_)][curr_metric].values
+        b_vals = b_df[b_df[sorter].isin(both_)][curr_metric].values
+        #a_vals = plotdf[plotdf[compare_var]==c1].sort_values(by=sorter)[curr_metric].values
+        #b_vals = plotdf[plotdf[compare_var]==c2].sort_values(by=sorter)[curr_metric].values
 
         by_exp = [(a, e) for a, e in zip(a_vals, b_vals)]
         for pi, p in enumerate(by_exp):
